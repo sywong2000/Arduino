@@ -33,6 +33,8 @@ class GearedMotor
 	void setSpeed(uint8_t value);
     void moveTo(long value);
     boolean run();
+    void move_CW();   // set up motion clockwise
+    void move_CCW();  // set up motion counter clockwise
 
   protected:
 // direction indicator, symbolic names. Maybe not used
@@ -41,8 +43,6 @@ class GearedMotor
         DIRECTION_CCW = 0,
         DIRECTION_CW = 1
     } Direction;
-    void move_CW();   // set up motion clockwise
-    void move_CCW();  // set up motion counter clockwise
 
   private:
     long _stepInterval = 1000;

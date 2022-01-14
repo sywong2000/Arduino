@@ -24,6 +24,8 @@ boolean useSleep = true; // true= use sleep pin, false = use enable pin
 //WvB
 */
 int powerPin = 7; //STDBY
+int buttonPin0 = 8; // btn 0
+int buttonPin1 = 9; // btn 1
 boolean useSleep = true; // true= use sleep pin, false = use enable pin
 
 // maximum speed is 160pps which should be OK for most
@@ -51,6 +53,8 @@ void setup()
 {
 	Serial.begin(9600);
 	pinMode(powerPin,OUTPUT);
+ pinMode(buttonPin0, INPUT_PULLUP);
+ pinMode(buttonPin1, INPUT_PULLUP);
   //pinMode(13,OUTPUT);
   //digitalWrite(13,LOW);
 	//wvb motor.setSpeed(MAXSPEED);
@@ -60,8 +64,8 @@ void setup()
 	//WvB Skywatcher motor has backlash. About 120 - 150 steps will do. Check if this has effect (haven't tried it yet)
 	//WvB Assume focuser starts at all the way in, which is position 0
 	motor.setCurrentPosition(0);
-	motor.setBacklashFlag(true);
-	motor.setBacklashSteps(120);
+	motor.setBacklashFlag(false);
+	//motor.setBacklashSteps(120);
 	//WvB new code ends here
 	turnOff();
 	memset(line, 0, MAXCOMMAND);
@@ -76,6 +80,7 @@ boolean ledon = false;
 
 void loop()
 {
+  
 	if (isRunning) { // only have to do this is stepper is on
 		motor.run();
 		if (motor.stepsToGo() == 0) 
@@ -115,6 +120,21 @@ void loop()
 			}
 		}
 	} // end while Serial.available()
+
+
+ if (digitalRead(buttonPin0)==LOW)
+  {
+    turnOn();
+    motor.moveTo(motor.currentPosition() - 1);
+  }
+
+  if (digitalRead(buttonPin1)==LOW)
+  {
+    turnOn();
+    motor.moveTo(motor.currentPosition() + 1);
+  }
+ 
+
  
 	// we may not have a complete command yet but there is no character coming in for now and might as well loop in case stepper needs updating
 	// eoc will flag if a full command is there to act upon

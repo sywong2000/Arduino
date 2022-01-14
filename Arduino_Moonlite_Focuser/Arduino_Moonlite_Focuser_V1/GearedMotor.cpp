@@ -14,7 +14,7 @@ GearedMotor::GearedMotor(uint8_t pin_EN, uint8_t pin1, uint8_t pin2)
   _targetPosition = 0;
   _stepInterval = 1000;
   _currentPosition = 0;
-  _speed = 255; // default: run at max speed
+  _speed = 254; // default: run at max speed
   pinMode(pin_EN, OUTPUT);
   pinMode(pin1, OUTPUT);
   pinMode(pin2, OUTPUT);
