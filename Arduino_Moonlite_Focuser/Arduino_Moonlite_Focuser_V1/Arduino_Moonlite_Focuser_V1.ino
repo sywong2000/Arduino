@@ -33,7 +33,8 @@ boolean useSleep = true; // true= use sleep pin, false = use enable pin
 #define MAXSPEED 160
 #define SPEEDMULT 3
 // PWM, AIN1, AIN2
-GearedMotor motor(4,6,5);
+// PWM in nano D3,5,6,9,10,11
+GearedMotor motor(3,6,5);
 
 #define MAXCOMMAND 8
 
@@ -42,9 +43,11 @@ char cmd[MAXCOMMAND];
 char param[MAXCOMMAND];
 char line[MAXCOMMAND];
 long pos;
+long whenbtn10, whenbtn11;
 int eoc = 0;
 int idx = 0;
 boolean isRunning = false;
+uint8_t CurSpeed = MAXSPEED;
 
 char tempString[10];
 
@@ -55,6 +58,8 @@ void setup()
 	pinMode(powerPin,OUTPUT);
  pinMode(buttonPin0, INPUT_PULLUP);
  pinMode(buttonPin1, INPUT_PULLUP);
+ pinMode(10, INPUT_PULLUP);
+ pinMode(11, INPUT_PULLUP);
   //pinMode(13,OUTPUT);
   //digitalWrite(13,LOW);
 	//wvb motor.setSpeed(MAXSPEED);
@@ -64,6 +69,7 @@ void setup()
 	//WvB Skywatcher motor has backlash. About 120 - 150 steps will do. Check if this has effect (haven't tried it yet)
 	//WvB Assume focuser starts at all the way in, which is position 0
 	motor.setCurrentPosition(0);
+  motor.setSpeed(MAXSPEED);
 	motor.setBacklashFlag(false);
 	//motor.setBacklashSteps(120);
 	//WvB new code ends here
@@ -77,10 +83,11 @@ void setup()
 //
 unsigned long time;
 boolean ledon = false;
-
+long now;
 void loop()
 {
-  
+
+  now = millis();
 	if (isRunning) { // only have to do this is stepper is on
 		motor.run();
 		if (motor.stepsToGo() == 0) 
@@ -133,8 +140,24 @@ void loop()
     turnOn();
     motor.moveTo(motor.currentPosition() + 1);
   }
- 
 
+ if (digitalRead(10)==LOW && CurSpeed<=230 && (now-whenbtn10)> 200)
+ { 
+   whenbtn10 = now;
+   CurSpeed+=20;
+   motor.setSpeed(CurSpeed);
+   
+   Serial.println(CurSpeed);
+ }
+
+ if (digitalRead(11)==LOW && CurSpeed>=80 && (now-whenbtn11)> 200)
+ {
+   whenbtn11 = now;
+   CurSpeed-=20;
+   motor.setSpeed(CurSpeed);
+   
+   Serial.println(CurSpeed);
+ }
  
 	// we may not have a complete command yet but there is no character coming in for now and might as well loop in case stepper needs updating
 	// eoc will flag if a full command is there to act upon
@@ -247,12 +270,12 @@ void loop()
 
 		//Set full-step mode.
 		if (!strcasecmp(cmd, "SF")) {
-			//do nothing yet
+      motor.setSpeed(MAXSPEED);
 		}
 
 		//Set half-step mode.
 		if (!strcasecmp(cmd, "SH")) {
-			//do nothing yet
+			motor.setSpeed(MAXSPEED/2);
 		}
 
 		//Set the new position where YYYY is a four-digit
