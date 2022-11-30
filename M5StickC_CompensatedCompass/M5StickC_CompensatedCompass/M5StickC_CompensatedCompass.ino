@@ -112,6 +112,16 @@ void calibrate(uint32_t timeout)
   value_offset.x = value_x_min + (value_x_max - value_x_min) / 2;
   value_offset.y = value_y_min + (value_y_max - value_y_min) / 2;
   value_offset.z = value_z_min + (value_z_max - value_z_min) / 2;
+
+  writeIntIntoEEPROM(0,value_offset.x);
+  writeIntIntoEEPROM(2,value_offset.y);
+  writeIntIntoEEPROM(4,value_offset.z);
+  EEPROM.commit();
+
+  Serial.printf("Calibration Offset written to EEPROM:");
+  Serial.printf("X: %d   Y: %d   Z: %d   ", value_offset.x,value_offset.y,value_offset.z);
+  Serial.println("");
+
 }
 
 void setup() {
@@ -132,9 +142,34 @@ void setup() {
   } else {
     Serial.println("Initialize done!");
   }
+
+  EEPROM.begin(6); //3 x int16_t
+
+  value_offset.x = readIntFromEEPROM(0);
+  value_offset.y = readIntFromEEPROM(2);
+  value_offset.z = readIntFromEEPROM(4);
+
+  Serial.printf("Calibration Offset loaded from EEPROM:");
+  Serial.printf("X: %d   Y: %d   Z: %d   ", value_offset.x,value_offset.y,value_offset.z);
+  Serial.println("");
+
 }
 
 
+void writeIntIntoEEPROM(int address, int16_t number)
+{ 
+  byte byte1 = number >> 8;
+  byte byte2 = number & 0xFF;
+  EEPROM.write(address, byte1);
+  EEPROM.write(address + 1, byte2);
+}
+
+int16_t readIntFromEEPROM(int address)
+{
+  byte byte1 = EEPROM.read(address);
+  byte byte2 = EEPROM.read(address + 1);
+  return (byte1 << 8) + byte2;
+}
 void loop() {
 
   M5.MPU6886.getAccelData(&accX, &accY, &accZ);
@@ -174,7 +209,7 @@ void loop() {
     heading = 2 * M_PI + heading;
   }
 
-  Serial.printf("Heading: %.2f ", heading * 57.295, phi * 57.295, theta * 57.295);
+  Serial.printf("Heading: %.2f   Pitch: %.2f    Roll: %.2f   ", heading * 57.295, phi * 57.295, theta * 57.295);
   Serial.println("");
 
   M5.Lcd.setCursor(0, 40, 2);
@@ -197,16 +232,21 @@ void loop() {
     M5.MPU6886.Init();
     M5.Lcd.fillScreen(BLACK);
     M5.Lcd.setCursor(0, 10, 2);
+    Serial.println("Calibrating compass now. Please flip and move the device around..");
     M5.Lcd.println("Calibrating compass now.");
     M5.Lcd.setCursor(0, 25, 2);
     M5.Lcd.println("Please flip & move the device around.");
     calibrate(10000);
-    Serial.print("\n\rCalibrate done..");
+    Serial.println("Calibrate done..");
     delay(5);
     //  M5.Speaker.beep();
     M5.Lcd.fillScreen(BLACK);
 
   }
+
+  M5.Lcd.setCursor(0, 0, 2);
+  M5.Lcd.println("Compass");
+
   M5.Lcd.setCursor(0, 20, 2);
   M5.Lcd.printf("Heading: %2.1f    ", heading * 57.2957795);
 
