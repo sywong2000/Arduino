@@ -1,11 +1,17 @@
 #include <Arduino.h>
-#include <SoftwareSerial.h>
+//#include <SoftwareSerial.h>
 #include <AccelStepper.h>
 #include <EEPROM.h>
 #include <TimerOne.h>
+#include <SPI.h>
+#include <Wire.h>
+#include "DummySerial.h"
+#include "SSD1306Ascii.h"
+#include "SSD1306AsciiWire.h"
 
-#define BTN_IN 7
-#define BTN_OUT 8
+
+#define BTN_IN 8
+#define BTN_OUT 9
 #define BTN_POTI_SPEED A0
 #define BTN_MIN_SPEED 8
 #define BTN_MAX_SPEED 512
@@ -25,16 +31,16 @@
 // Motor acceleration in steps per second per second
 #define ACCELERATION 100
 
-#define USE_DRIVER
 
-#define DEBUG
+//#define DEBUG
 #ifdef DEBUG
-SoftwareSerial debugSerial(9, 10);
+SoftwareSerial debugSerial(10, 11);
 #else
 DummySerial debugSerial;
 #endif
 
 // initialize the stepper library
+#define USE_DRIVER
 #ifdef USE_DRIVER
 AccelStepper stepper(AccelStepper::DRIVER, PIN_DRIVER_STEP, PIN_DRIVER_DIR);
 #else
@@ -65,17 +71,25 @@ long hexstr2long(String line);
 static void intHandler();
 int readButtonSpeed();
 
+#define I2C_ADDRESS 0x3C
+SSD1306AsciiWire oled;
+
 /*************************************
  * SETUP
  *************************************/
 void setup()
 {
+  Wire.begin();
+  oled.begin(&Adafruit128x32, I2C_ADDRESS);
+  oled.set400kHz();
+  oled.setFont(X11fixed7x14B);
+
   Serial.begin(9600);
   debugSerial.begin(9600);
 
   // setup pins
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, LOW);
+//  pinMode(LED_BUILTIN, OUTPUT);
+//  digitalWrite(LED_BUILTIN, LOW);
 
   // initalize motor
   debugSerial.println("init motor driver...");
@@ -101,6 +115,7 @@ void setup()
   debugSerial.print("Last position in EEPROM...");
   debugSerial.println(lastSavedPosition);
 
+
   // init temperature sensor
 //  sensors.begin();
 //  if(sensors.getDeviceCount()){
@@ -115,6 +130,12 @@ void setup()
   // init timer
   Timer1.initialize(PERIOD_US);
   Timer1.attachInterrupt(intHandler);
+
+  oled.clear();
+  oled.setRow(1);
+  oled.setCol(4);
+  oled.println("READY");
+
 }
 
 /*************************************
@@ -128,6 +149,9 @@ void loop()
   {
     debugSerial.print("Got new command: ");
     debugSerial.println(line);
+    
+    oled.setRow(1);
+    oled.println(line+"         ");
 
     if (line.startsWith("2"))
     {
@@ -484,7 +508,6 @@ static void intHandler()
     moving = stepper.distanceToGo() != 0;
   }
 
-  digitalWrite(LED_BUILTIN, moving);
 }
 
 int readButtonSpeed()
