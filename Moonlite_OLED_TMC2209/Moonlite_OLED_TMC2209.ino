@@ -80,8 +80,8 @@ SSD1306AsciiWire oled;
 void setup()
 {
   Wire.begin();
+  Wire.setClock(400000L);
   oled.begin(&Adafruit128x32, I2C_ADDRESS);
-  oled.set400kHz();
   oled.setFont(X11fixed7x14B);
 
   Serial.begin(9600);
@@ -127,14 +127,15 @@ void setup()
   pinMode(BTN_OUT, INPUT_PULLUP);
   pinMode(BTN_POTI_SPEED, INPUT_PULLUP);
 
-  // init timer
-  Timer1.initialize(PERIOD_US);
-  Timer1.attachInterrupt(intHandler);
 
   oled.clear();
   oled.setRow(1);
-  oled.setCol(4);
+  oled.setCol(10);
   oled.println("READY");
+
+  // init timer
+  Timer1.initialize(PERIOD_US);
+  Timer1.attachInterrupt(intHandler);
 
 }
 
@@ -147,11 +148,10 @@ void loop()
   // process the command we got
   if (eoc)
   {
+    updateOLED();
     debugSerial.print("Got new command: ");
     debugSerial.println(line);
     
-    oled.setRow(1);
-    oled.println(line+"         ");
 
     if (line.startsWith("2"))
     {
@@ -354,6 +354,8 @@ void loop()
       debugSerial.print(" -> ");
       targetPosition = hexstr2long(param);
       debugSerial.println(targetPosition);
+
+
       // Serial.println(targetPosition);
       // stepper.moveTo(pos);
     }
@@ -507,8 +509,26 @@ static void intHandler()
     stepper.run();
     moving = stepper.distanceToGo() != 0;
   }
-
+  //updateOLED();
 }
+
+
+char s1[8];
+char s2[8];
+
+
+static void updateOLED()
+{
+  oled.setRow(1);
+  sprintf(s1, "%06d", currentPosition);
+  oled.setCol(10);
+  oled.print(s1);
+  oled.setCol(60);
+  sprintf(s2, "%06d", targetPosition);
+  oled.print(s2);
+  
+}
+
 
 int readButtonSpeed()
 {
