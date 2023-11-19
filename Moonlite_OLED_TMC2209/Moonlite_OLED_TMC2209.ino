@@ -1,11 +1,11 @@
 #include <Arduino.h>
-//#include <SoftwareSerial.h>
+#include <SoftwareSerial.h>
 #include <AccelStepper.h>
 #include <EEPROM.h>
 #include <TimerOne.h>
 #include <SPI.h>
 #include <Wire.h>
-#include "DummySerial.h"
+//#include "DummySerial.h"
 #include "SSD1306Ascii.h"
 #include "SSD1306AsciiWire.h"
 
@@ -18,9 +18,9 @@
 #define BTN_ACCEL_FACTOR 1.05f
 
 
-#define PIN_DRIVER_SLEEP 5
-#define PIN_DRIVER_DIR 7
+#define PIN_DRIVER_ENABLE 5
 #define PIN_DRIVER_STEP 6
+#define PIN_DRIVER_DIR 7
 
 #define ONE_WIRE_BUS 2
 
@@ -32,7 +32,7 @@
 #define ACCELERATION 100
 
 
-//#define DEBUG
+#define DEBUG
 #ifdef DEBUG
 SoftwareSerial debugSerial(10, 11);
 #else
@@ -42,7 +42,7 @@ DummySerial debugSerial;
 // initialize the stepper library
 #define USE_DRIVER
 #ifdef USE_DRIVER
-AccelStepper stepper(AccelStepper::DRIVER, PIN_DRIVER_STEP, PIN_DRIVER_DIR);
+AccelStepper stepper(1, PIN_DRIVER_STEP, PIN_DRIVER_DIR);
 #else
 AccelStepper stepper(AccelStepper::FULL4WIRE, 6, 4, 5, 3, false);
 #endif
@@ -59,7 +59,7 @@ unsigned long targetPosition = 0;
 unsigned long lastSavedPosition = 0;
 long millisLastMove = 0;
 const long millisDisableDelay = 15000;
-bool isEnabled = false;
+bool isEnabled = true;
 bool isInManualMode = false;
 
 // read commands
@@ -82,10 +82,10 @@ void setup()
   Wire.begin();
   Wire.setClock(400000L);
   oled.begin(&Adafruit128x32, I2C_ADDRESS);
-  oled.setFont(X11fixed7x14B);
+  
 
   Serial.begin(9600);
-  debugSerial.begin(9600);
+  debugSerial.begin(115200);
 
   // setup pins
 //  pinMode(LED_BUILTIN, OUTPUT);
@@ -96,10 +96,10 @@ void setup()
   stepper.setMaxSpeed(speedFactor * SPEED_MULTIPLICATOR);
   stepper.setAcceleration(ACCELERATION);
 #ifdef USE_DRIVER
-  debugSerial.println("Using A4988 driver");
-  //stepper.setEnablePin(PIN_DRIVER_SLEEP);
+  debugSerial.println("Using standalone driver");
+  stepper.setEnablePin(PIN_DRIVER_ENABLE);
   stepper.disableOutputs();
-  isEnabled = false;
+  isEnabled = true;
 #endif
   millisLastMove = millis();
 
@@ -129,6 +129,7 @@ void setup()
 
 
   oled.clear();
+  oled.setFont(Callibri15);
   oled.setRow(1);
   oled.setCol(10);
   oled.println("READY");
@@ -362,7 +363,7 @@ void loop()
     // initiate a move
     if (cmd.equalsIgnoreCase("FG"))
     {
-      stepper.enableOutputs();
+      stepper.disableOutputs();
       isEnabled = true;
       stepper.moveTo(targetPosition);
     }
@@ -391,7 +392,7 @@ void loop()
     // enable motor outputs if motor is idle
     if (!isEnabled)
     {
-      stepper.enableOutputs();
+      stepper.disableOutputs();
       isEnabled = true;
     }
     // save current speed settings
@@ -460,9 +461,9 @@ void loop()
       if (isEnabled)
       {
         // set motor to sleep state
-        stepper.disableOutputs();
+        stepper.enableOutputs();
         isEnabled = false;
-        debugSerial.println("Disabled output pins");
+        debugSerial.println("Put motor to sleep");
       }
     }
   }
@@ -519,13 +520,18 @@ char s2[8];
 
 static void updateOLED()
 {
-  oled.setRow(1);
+  oled.setFont(Callibri15);
+  oled.setRow(0);
   sprintf(s1, "%06d", currentPosition);
   oled.setCol(10);
   oled.print(s1);
   oled.setCol(60);
   sprintf(s2, "%06d", targetPosition);
   oled.print(s2);
+  oled.setRow(2);
+  oled.setFont(Callibri11);
+  oled.setCol(10);
+  oled.print(isInManualMode?"Manual":"Moonlite");
   
 }
 
