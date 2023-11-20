@@ -58,6 +58,7 @@ unsigned long currentPosition = 0;
 unsigned long targetPosition = 0;
 unsigned long lastSavedPosition = 0;
 long millisLastMove = 0;
+long millisLastBtnPressed = 0;
 const long millisDisableDelay = 15000;
 bool isEnabled = true;
 bool isInManualMode = false;
@@ -386,63 +387,95 @@ void loop()
     currentPosition = stepper.currentPosition();
   }
   // handle manual buttons
-  else if (btn_in == LOW || btn_out == LOW)
+  else if ((btn_in == LOW || btn_out == LOW) )
   {
-    isInManualMode = true;
-    // enable motor outputs if motor is idle
-    if (!isEnabled)
+    if (millis() - millisLastBtnPressed > 100)
     {
-      stepper.disableOutputs();
-      isEnabled = true;
-    }
-    // save current speed settings
-    auto tmpMaxSpeed = stepper.maxSpeed();
-    auto tmpSpeed = stepper.speed();
-    // run loop while buttons are pressed
-    float speed = BTN_MIN_SPEED;
-    stepper.setSpeed(speed);
-    stepper.setMaxSpeed(readButtonSpeed());
-    while (btn_in == LOW || btn_out == LOW)
-    {
-      debugSerial.print("Speed from poti: ");
-      debugSerial.println(speed);
-      stepper.setMaxSpeed(readButtonSpeed());
-      if (btn_in == LOW && speed < 0)
+    if (btn_in == LOW)
       {
-        speed = BTN_MIN_SPEED;
-        debugSerial.println("Button forward ");
+        targetPosition = (targetPosition>=10)?targetPosition-10:targetPosition;
+        stepper.disableOutputs();
+        isEnabled = true;
+        stepper.moveTo(targetPosition);
       }
-      else if (btn_out == LOW && speed > 0)
+      else
       {
-        // prevent negative values
-        speed = -BTN_MIN_SPEED;
-        debugSerial.println("Button backward ");
+        targetPosition = targetPosition + 10;
+        stepper.disableOutputs();
+        isEnabled = true;
+        stepper.moveTo(targetPosition);
+        
       }
-      speed = constrain(speed * BTN_ACCEL_FACTOR, -stepper.maxSpeed(), stepper.maxSpeed());
-      debugSerial.print("Set speed to ");
-      debugSerial.println(speed);
-      stepper.setSpeed(speed); // set speed with direction
-      delay(25);
-
-      // read new button values
-      btn_in = digitalRead(BTN_IN);
-      btn_out = digitalRead(BTN_OUT);
     }
 
-    // // stop and ensure the stepper isn't moving anymore
-    stepper.moveTo(stepper.currentPosition());
-    while (stepper.distanceToGo())
-    {
-      debugSerial.println("Stopping motor...");
-    }
+    millisLastBtnPressed = millis();
 
-    // reset speed
-    stepper.setMaxSpeed(tmpMaxSpeed);
-    stepper.setSpeed(tmpSpeed);
+    
 
-    millisLastMove = millis();
-    currentPosition = targetPosition = stepper.currentPosition();
-    isInManualMode = false;
+    
+//    isInManualMode = true;
+//    // enable motor outputs if motor is idle
+//    if (!isEnabled)
+//    {
+//      stepper.disableOutputs();
+//      isEnabled = true;
+//    }
+//    // save current speed settings
+//    auto tmpMaxSpeed = stepper.maxSpeed();
+//    auto tmpSpeed = stepper.speed();
+//    
+//    
+//    
+//    // run loop while buttons are pressed
+//    
+//    float speed = BTN_MIN_SPEED;
+//    stepper.setSpeed(speed);
+//    stepper.setMaxSpeed(readButtonSpeed());
+//
+//    
+//    while (btn_in == LOW || btn_out == LOW)
+//    {
+//      debugSerial.print("Speed from poti: ");
+//      debugSerial.println(speed);
+//      stepper.setMaxSpeed(readButtonSpeed());
+//      if (btn_in == LOW && speed < 0)
+//      {
+//        speed = BTN_MIN_SPEED;
+//        debugSerial.println("Button forward ");
+//      }
+//      else if (btn_out == LOW && speed > 0)
+//      {
+//        // prevent negative values
+//        speed = -BTN_MIN_SPEED;
+//        debugSerial.println("Button backward ");
+//      }
+//      speed = constrain(speed * BTN_ACCEL_FACTOR, -stepper.maxSpeed(), stepper.maxSpeed());
+//      debugSerial.print("Set speed to ");
+//      debugSerial.println(speed);
+//      stepper.setSpeed(speed); // set speed with direction
+//      delay(25);
+//
+//      // read new button values
+//      btn_in = digitalRead(BTN_IN);
+//      btn_out = digitalRead(BTN_OUT);
+//    }
+//
+//    // // stop and ensure the stepper isn't moving anymore
+//    stepper.moveTo(stepper.currentPosition());
+//    while (stepper.distanceToGo())
+//    {
+//      debugSerial.println("Stopping motor...");
+//    }
+//
+//    // reset speed
+//    stepper.setMaxSpeed(tmpMaxSpeed);
+//    stepper.setSpeed(tmpSpeed);
+//
+//    millisLastMove = millis();
+//    currentPosition = targetPosition = stepper.currentPosition();
+//    isInManualMode = false;
+//
+    
   }
   else
   {
