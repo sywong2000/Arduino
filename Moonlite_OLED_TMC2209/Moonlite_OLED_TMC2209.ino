@@ -3,36 +3,38 @@
 #include <AccelStepper.h>
 #include <EEPROM.h>
 #include <TimerOne.h>
-#include <SPI.h>
 #include <Wire.h>
-//#include "DummySerial.h"
+#include "DummySerial.h"
 #include "SSD1306Ascii.h"
 #include "SSD1306AsciiWire.h"
 
 
-#define BTN_IN 8
+// remember to comment 	-> if (_usbLineInfo.lineState > 0)	{
+// in serial:write function as workaround for Sparkfun Pro Micro board
+// because the RTS and DTR needs to be disabled
+
+
+#define BTN_IN 7
 #define BTN_OUT 9
-#define BTN_POTI_SPEED A0
+#define BTN_SPEED_TOGGLE 8
 #define BTN_MIN_SPEED 8
 #define BTN_MAX_SPEED 512
 #define BTN_ACCEL_FACTOR 1.05f
 
 
-#define PIN_DRIVER_ENABLE 5
-#define PIN_DRIVER_STEP 6
-#define PIN_DRIVER_DIR 7
-
-#define ONE_WIRE_BUS 2
+#define PIN_DRIVER_ENABLE 4
+#define PIN_DRIVER_STEP 5
+#define PIN_DRIVER_DIR 6
 
 #define PERIOD_US 2000
 
 // Maximum motor speed multiplicator in steps per second
-#define SPEED_MULTIPLICATOR 30
+#define SPEED_MULTIPLICATOR 20
 // Motor acceleration in steps per second per second
-#define ACCELERATION 100
+#define ACCELERATION 80
 
 
-#define DEBUG
+//#define DEBUG
 #ifdef DEBUG
 SoftwareSerial debugSerial(10, 11);
 #else
@@ -50,6 +52,7 @@ AccelStepper stepper(AccelStepper::FULL4WIRE, 6, 4, 5, 3, false);
 // multiplier of SPEEDMUX, currently max speed is 480.
 int speedFactor = 16;
 int speedFactorRaw = 4;
+int nManualBtnPressDelay = 100;
 
 float tCoeff = 0;
 
@@ -62,6 +65,7 @@ long millisLastBtnPressed = 0;
 const long millisDisableDelay = 15000;
 bool isEnabled = true;
 bool isInManualMode = false;
+bool bHighSpeed = false;
 
 // read commands
 bool eoc = false;
@@ -69,8 +73,7 @@ String line;
 
 // function declarations
 long hexstr2long(String line);
-static void intHandler();
-int readButtonSpeed();
+//static void intHandler();
 
 #define I2C_ADDRESS 0x3C
 SSD1306AsciiWire oled;
@@ -83,10 +86,8 @@ void setup()
   Wire.begin();
   Wire.setClock(400000L);
   oled.begin(&Adafruit128x32, I2C_ADDRESS);
-  
-
-  Serial.begin(9600);
   debugSerial.begin(115200);
+  Serial.begin(115200);
 
   // setup pins
 //  pinMode(LED_BUILTIN, OUTPUT);
@@ -126,35 +127,55 @@ void setup()
   // setup buttons
   pinMode(BTN_IN, INPUT_PULLUP);
   pinMode(BTN_OUT, INPUT_PULLUP);
-  pinMode(BTN_POTI_SPEED, INPUT_PULLUP);
-
+  pinMode(BTN_SPEED_TOGGLE, INPUT_PULLUP);
 
   oled.clear();
   oled.setFont(Callibri15);
   oled.setRow(1);
   oled.setCol(10);
-  oled.println("READY");
+  oled.println("READY      ");
+  
 
   // init timer
-  Timer1.initialize(PERIOD_US);
-  Timer1.attachInterrupt(intHandler);
-
+ Timer1.initialize(PERIOD_US);
+ Timer1.attachInterrupt(intHandler);
 }
 
 /*************************************
  * LOOP
  *************************************/
+
+String cmd, param;
 void loop()
 {
+  while (Serial.available()>0)
+  {
+    char c = Serial.read();
+    if (c != '#' && c != ':')
+    {
+      line = line + c;
+    }
+    else
+    {
+      if (c == '#')
+      {
+        eoc = true;
+      }
+      if (c == ':')
+      {
+        line = "";
+      }
+    }
+  }
+
 
   // process the command we got
   if (eoc)
   {
-    updateOLED();
+    
     debugSerial.print("Got new command: ");
     debugSerial.println(line);
     
-
     if (line.startsWith("2"))
     {
       debugSerial.println("Got Dual focuser command(?) starting with 2. Send values of first motor");
@@ -162,7 +183,7 @@ void loop()
       line = line.substring(1);
     }
 
-    String cmd, param;
+    
     int len = line.length();
     if (len >= 2)
     {
@@ -177,6 +198,9 @@ void loop()
       param = line.substring(2);
     }
 
+    cmd.trim();
+    param.trim();
+
     debugSerial.print("Got line: ");
     debugSerial.println(line);
     debugSerial.print("Command: ");
@@ -188,9 +212,7 @@ void loop()
     }
     debugSerial.println();
 
-    line = "";
-    eoc = false;
-
+    
     // LED backlight value, always return "00"
     if (cmd.equalsIgnoreCase("GB"))
     {
@@ -214,7 +236,7 @@ void loop()
     if (cmd.equalsIgnoreCase("C"))
     {
       debugSerial.println("No temperature conversion implemented, yet");
-      // Serial.print("10#");
+      //Serial.print("10#");
     }
     // get the current motor position
     if (cmd.equalsIgnoreCase("GP"))
@@ -373,10 +395,16 @@ void loop()
     {
       stepper.stop();
     }
-  }
+    
+    line = "";
+    eoc = false;
+
+  } // eoc
 
   int btn_in = digitalRead(BTN_IN);
   int btn_out = digitalRead(BTN_OUT);
+  int btn_speed_toggle = digitalRead(BTN_SPEED_TOGGLE);
+  bHighSpeed = (btn_speed_toggle==LOW);
 
   // move motor if not done
   if (stepper.distanceToGo() != 0)
@@ -389,7 +417,7 @@ void loop()
   // handle manual buttons
   else if ((btn_in == LOW || btn_out == LOW) )
   {
-    if (millis() - millisLastBtnPressed > 100)
+    if (millis() - millisLastBtnPressed > nManualBtnPressDelay)
     {
     if (btn_in == LOW)
       {
@@ -503,25 +531,26 @@ void loop()
 }
 
 // read the command until the terminating # character
-void serialEvent()
-{
-  // read the command until the terminating # character
-  while (Serial.available() && !eoc)
-  {
-    char c = Serial.read();
-    if (c != '#' && c != ':')
-    {
-      line = line + c;
-    }
-    else
-    {
-      if (c == '#')
-      {
-        eoc = true;
-      }
-    }
-  }
-}
+//void serialEvent()
+//{
+//  // read the command until the terminating # character
+//  while (Serial.available()>0 && !eoc)
+//  //while (SerialUSB && !eoc)
+//  {
+//    char c = Serial.read();
+//    if (c != '#' && c != ':')
+//    {
+//      line = line + c;
+//    }
+//    else
+//    {
+//      if (c == '#')
+//      {
+//        eoc = true;
+//      }
+//    }
+//  }
+//}
 
 long hexstr2long(String line)
 {
@@ -532,24 +561,32 @@ long hexstr2long(String line)
 
 static void intHandler()
 {
-  bool moving = false;
-  if (isInManualMode)
-  {
-    stepper.runSpeed();
-    moving = abs(stepper.speed()) > 0;
-  }
-  else
-  {
-    stepper.run();
-    moving = stepper.distanceToGo() != 0;
-  }
-  //updateOLED();
+ bool moving = false;
+ if (isInManualMode)
+ {
+   stepper.runSpeed();
+   moving = abs(stepper.speed()) > 0;
+ }
+ else
+ {
+   stepper.run();
+   moving = stepper.distanceToGo() != 0;
+ }
 }
 
 
 char s1[8];
 char s2[8];
 
+
+// static void updateOLED(String s)
+// {
+//   oled.clear();
+//   oled.setFont(Callibri15);
+//   oled.setRow(2);
+//   oled.setCol(10);
+//   oled.print(s);
+// }
 
 static void updateOLED()
 {
@@ -561,18 +598,12 @@ static void updateOLED()
   oled.setCol(60);
   sprintf(s2, "%06d", targetPosition);
   oled.print(s2);
-  oled.setRow(2);
-  oled.setFont(Callibri11);
-  oled.setCol(10);
-  oled.print(isInManualMode?"Manual":"Moonlite");
+  // oled.setRow(2);
+  // oled.setFont(Callibri11);
+  // oled.setCol(10);
   
-}
-
-
-int readButtonSpeed()
-{
-  // analogRead 0 -> min speed, 1023 -> max speed so if there is nothing connected
-  // the motor will accelerate to max speed
-  auto speedVal = map(analogRead(BTN_POTI_SPEED), 50, 900, BTN_MIN_SPEED, BTN_MAX_SPEED);
-  return max(min(speedVal, BTN_MAX_SPEED), BTN_MIN_SPEED);
+  
+  //oled.print(bHighSpeed?"HI":"LO");
+  //oled.print(isInManualMode?"Manual":"Moonlite");
+  
 }
