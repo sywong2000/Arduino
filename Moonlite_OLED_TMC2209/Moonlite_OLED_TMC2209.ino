@@ -29,9 +29,10 @@
 #define PERIOD_US 2000
 
 // Maximum motor speed multiplicator in steps per second
-#define SPEED_MULTIPLICATOR 200
+#define SPEED_MULTIPLICATOR 500
 // Motor acceleration in steps per second per second
-#define ACCELERATION 100
+//#define ACCELERATION 100
+int nAcceleration = 100;
 
 
 #define DEBUG
@@ -96,7 +97,7 @@ void setup()
   // initalize motor
   debugSerial.println("init motor driver...");
   stepper.setMaxSpeed(speedFactor * SPEED_MULTIPLICATOR);
-  stepper.setAcceleration(ACCELERATION);
+  stepper.setAcceleration(nAcceleration);
 #ifdef USE_DRIVER
   debugSerial.println("Using standalone driver");
   stepper.setEnablePin(PIN_DRIVER_ENABLE);
@@ -139,6 +140,7 @@ void setup()
 
 
   // init timer
+  
  Timer1.initialize(PERIOD_US);
  Timer1.attachInterrupt(intHandler);
 }
@@ -154,6 +156,7 @@ void loop()
   // process the command we got
   if (eoc)
   {
+    stepper.setAcceleration(100);
     debugSerial.print("Got new command: ");
     debugSerial.println(line);
     
@@ -387,8 +390,10 @@ void loop()
   int btn_in = digitalRead(BTN_IN);
   int btn_out = digitalRead(BTN_OUT);
   int btn_speed_toggle = digitalRead(BTN_SPEED_TOGGLE);
+  
   bHighSpeed = (btn_speed_toggle==HIGH);
-  int nManualStepToGo = bHighSpeed?100:10;
+  int nManualStepToGo = bHighSpeed?50:5;
+  stepper.setAcceleration(bHighSpeed?200:50);
 
   // move motor if not done
   if (stepper.distanceToGo() != 0)
@@ -416,8 +421,10 @@ void loop()
         stepper.disableOutputs();
         isEnabled = true;
         stepper.moveTo(targetPosition);
-        
       }
+    debugSerial.print("Target Position: ");
+    debugSerial.println(targetPosition);
+
     }
 
     millisLastBtnPressed = millis();
@@ -513,20 +520,23 @@ static void updateOLED()
 {
   oled.setFont(Callibri15);
   oled.setRow(0);
-  oled.setCol(10);
-  sprintf(s1, "%06d", currentPosition);
+  oled.setCol(5);
+  sprintf(s1, "P: %05d", currentPosition);
   oled.print(s1);
   oled.setCol(60);
-  sprintf(s2, "%06d", targetPosition);
+  sprintf(s2, "[%05d]", targetPosition);
   oled.print(s2);
    oled.setRow(2);
    oled.setFont(Callibri11);
-  oled.setCol(10);
+  oled.setCol(5);
   oled.print(bHighSpeed?"HI ":"LO ");
   
   
 }
-
+// this is for sparkfun pro micro
+void serialEventRun(void) {
+  if (Serial.available()) serialEvent();
+}
 
 void serialEvent() {
   while (Serial.available()>0 && !eoc)
