@@ -63,7 +63,7 @@ unsigned long targetPosition = 0;
 unsigned long lastSavedPosition = 0;
 long millisLastMove = 0;
 long millisLastBtnPressed = 0;
-const long millisDisableDelay = 15000;
+const long millisDisableDelay = 30000;
 bool isEnabled = true;
 bool isInManualMode = false;
 bool bHighSpeed = false;
@@ -108,7 +108,13 @@ void setup()
 
   // read saved position from EEPROM
   EEPROM.get(0, currentPosition);
-  if (isnan(currentPosition) || currentPosition<0 || currentPosition>65535)
+
+  int btn_in = digitalRead(BTN_IN);
+  int btn_out = digitalRead(BTN_OUT);
+  // add logic if both button pressed, also set the current position as 10000
+  
+  
+  if (isnan(currentPosition) || currentPosition<0 || currentPosition>65535 || (btn_in==LOW && btn_out==LOW))
   {
     EEPROM.put(0, (long)10000);
   }
@@ -129,9 +135,13 @@ void setup()
   // setup buttons
   pinMode(BTN_IN, INPUT_PULLUP);
   pinMode(BTN_OUT, INPUT_PULLUP);
+
+
   pinMode(BTN_SPEED_TOGGLE, INPUT_PULLUP);
 
   oled.clear();
+  oled.ssd1306WriteCmd(SSD1306_SEGREMAP);
+  oled.ssd1306WriteCmd(SSD1306_COMSCANINC);
   oled.setFont(Callibri15);
   oled.setRow(0);
   oled.setCol(10);
@@ -521,15 +531,15 @@ static void updateOLED()
   oled.setFont(Callibri15);
   oled.setRow(0);
   oled.setCol(5);
-  sprintf(s1, "P: %05d", currentPosition);
+  sprintf(s1, "Pos:  %05d", currentPosition);
   oled.print(s1);
-  oled.setCol(60);
+  oled.setCol(85);
   sprintf(s2, "[%05d]", targetPosition);
   oled.print(s2);
    oled.setRow(2);
    oled.setFont(Callibri11);
   oled.setCol(5);
-  oled.print(bHighSpeed?"HI ":"LO ");
+  oled.print(!isEnabled?"Motor Sleep":bHighSpeed?"Speed: HI     ":"Speed: LO     ");
   
   
 }
