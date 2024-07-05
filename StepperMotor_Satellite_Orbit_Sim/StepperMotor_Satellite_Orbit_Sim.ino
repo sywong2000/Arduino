@@ -18,11 +18,13 @@ long btnDelay = 40;
 long DbtnDelay = 400;
 long nPressed = 0;
 
+int ledPin = 10;
+
 //AccelStepper stepper(1, stepPin, dirPin);
 int position = 0;
 int nStepSize = 40;
 int nSpeed = 800;
-
+int brightness = 0;
 
 #define SW_SCK           5      // Software Slave Clock (SCK) - BLUE
 #define SW_TX            6      // SoftwareSerial receive pin - BROWN
@@ -62,6 +64,10 @@ void setup() {
   stepper.disableOutputs();
 
   Serial.begin(115200);
+  
+  //default brightness
+  brightness = 128;
+  brightness = map(brightness, 0,255,0,255);
 
 }
 
@@ -75,12 +81,12 @@ void loop()
   // Set the current position to 0:
   stepper.setCurrentPosition(0);
  
-  // Run the motor forward at 200 steps/second until the motor reaches 400 steps (2 revolutions):
   nSpeed = 600;
   Serial.print("Running at speed:");
   Serial.println(nSpeed);
   t1 = millis();
-  while(stepper.currentPosition() != 1600)
+
+  while(stepper.currentPosition() < 1600)
   {
     stepper.setSpeed(nSpeed);
     stepper.runSpeed();
@@ -92,24 +98,26 @@ void loop()
  
   delay(1000);
  
-  // Reset the position to 0:
-  stepper.setCurrentPosition(0);
- 
-  // Run the motor backwards at 600 steps/second until the motor reaches -200 steps (1 revolution):
   nSpeed = -6.6;
   Serial.print("Running at speed:");
   Serial.println(nSpeed);
   t1 = millis();
 
-  while(stepper.currentPosition() != -1600) 
+  while(stepper.currentPosition() >=0) 
   {
     stepper.setSpeed(nSpeed);
     stepper.runSpeed();
   }
+
+
   d = millis() - t1;
   Serial.print("Duration: ");
   Serial.print(d);
   Serial.println(" ms.");
+
+  
+
+  analogWrite(ledPin, brightness);
  
   // delay(1000);
  
