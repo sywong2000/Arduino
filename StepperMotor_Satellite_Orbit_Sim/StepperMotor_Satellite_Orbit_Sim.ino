@@ -53,6 +53,7 @@ void setup() {
   pinMode(stepPin, OUTPUT);
   pinMode(dirPin, OUTPUT);
   pinMode(enablePin, OUTPUT);
+  pinMode(ledPin, OUTPUT);
   // pinMode(ms1Pin, OUTPUT);
   // pinMode(ms2Pin, OUTPUT);
 
@@ -66,7 +67,7 @@ void setup() {
   Serial.begin(115200);
 
   //default brightness
-  brightness = 128;
+  brightness = 10;
   brightness = map(brightness, 0, 255, 0, 255);
 }
 
@@ -78,6 +79,7 @@ bool bSimStarted = false;
 
 void loop() {
 
+  analogWrite(ledPin,brightness);
   nSpeed = 1200;
   while (digitalRead(btn11) == LOW) {
     bSimStarted = false;
