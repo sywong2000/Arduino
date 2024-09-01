@@ -9,6 +9,7 @@
 #define SW_RX            7      // SoftwareSerial transmit pin - YELLOW
 #define DRIVER_ADDRESS   0b00   // TMC2209 Driver address according to MS1 and MS2
 #define R_SENSE 0.11f           // SilentStepStick series use 0.11 ...and so does my fysetc TMC2209 (?)
+#define RMS_CURRENT       120
 
 const int enablePin = 2;
 const int stepPin = 4;
@@ -52,10 +53,16 @@ void setup() {
   driver.beginSerial(115200);      // Initialize UART
   driver.begin();                                                                                                                                                                                                                                                                                                                            // UART: Init SW UART (if selected) with default 115200 baudrate
   driver.toff(5);                 // Enables driver in software
-  driver.rms_current(1200);        // Set motor RMS current
+  driver.blank_time(24);
+  driver.rms_current(RMS_CURRENT);        // Set motor RMS current
   driver.microsteps(16);         // Set microsteps
   driver.en_spreadCycle(false);
   driver.pwm_autoscale(true);     // Needed for stealthChop
+  driver.TCOOLTHRS(0xFFFFF);
+  driver.semin(5);
+  driver.semax(2);
+  driver.sedn(0b01);
+
 
   pinMode(stepPin, OUTPUT);
   pinMode(dirPin, OUTPUT);
@@ -286,7 +293,7 @@ void loop() {
     // initiate a move
     if (cmd.equalsIgnoreCase("FG"))
     {
-      driver.rms_current(1200);
+      driver.rms_current(RMS_CURRENT);
       stepper.disableOutputs();
       stepper.setSpeed(targetPosition< stepper.currentPosition()?nSpeed*-1:nSpeed);
       stepper.setAcceleration(targetPosition< stepper.currentPosition()?nSpeed*-1:nSpeed);
@@ -314,18 +321,18 @@ void loop() {
     millisLastMove = millis();
   }
 
-  if (millis() - millisLastMove > millisDisableDelay)
-  {
-    // Save current location in EEPROM
-    if (lastSavedPosition != currentPosition)
-    {
-      EEPROM.put(0, currentPosition);
-      lastSavedPosition = currentPosition;
-    }
-    // set motor to sleep state
-    driver.rms_current(500);
-    stepper.enableOutputs();
-  }
+  // if (millis() - millisLastMove > millisDisableDelay)
+  // {
+  //   // Save current location in EEPROM
+  //   if (lastSavedPosition != currentPosition)
+  //   {
+  //     EEPROM.put(0, currentPosition);
+  //     lastSavedPosition = currentPosition;
+  //   }
+  //   // set motor to sleep state
+  //   driver.rms_current(500);
+  //   stepper.enableOutputs();
+  // }
 }
 
 
