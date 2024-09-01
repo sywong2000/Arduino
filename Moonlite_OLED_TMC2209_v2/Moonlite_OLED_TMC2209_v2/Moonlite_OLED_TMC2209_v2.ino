@@ -1,7 +1,7 @@
 #include <EEPROM.h>
 #include <TMCStepper.h>         // TMCstepper - https://github.com/teemuatlut/TMCStepper
 #include <AccelStepper.h>
-#include <SoftwareSerial.h>     // Software serial for the UART to TMC2209 - https://www.arduino.cc/en/Reference/softwareSerial
+// #include <SoftwareSerial.h>     // Software serial for the UART to TMC2209 - https://www.arduino.cc/en/Reference/softwareSerial
 
 
 #define SW_SCK           5      // Software Slave Clock (SCK) - BLUE
@@ -9,16 +9,18 @@
 #define SW_RX            7      // SoftwareSerial transmit pin - YELLOW
 #define DRIVER_ADDRESS   0b00   // TMC2209 Driver address according to MS1 and MS2
 #define R_SENSE 0.11f           // SilentStepStick series use 0.11 ...and so does my fysetc TMC2209 (?)
-#define RMS_CURRENT       120
+#define RMS_CURRENT       50
+#define STALL_VALUE       100   // 0 - 255, higher value more sensitive
 
-const int enablePin = 2;
+
+const int enablePin = 12;
 const int stepPin = 4;
 const int dirPin = 3;
 const int ms1Pin = 8;
 const int ms2Pin = 9;
 
-SoftwareSerial SoftSerial(SW_RX, SW_TX);                          // Be sure to connect RX to TX and TX to RX between both devices
-TMC2209Stepper driver(&SoftSerial, R_SENSE, DRIVER_ADDRESS);   // Create TMC driver
+// SoftwareSerial SoftSerial(SW_RX, SW_TX);                          // Be sure to connect RX to TX and TX to RX between both devices
+TMC2209Stepper driver(SW_RX, SW_TX, R_SENSE, DRIVER_ADDRESS);   // Create TMC driver
 AccelStepper stepper = AccelStepper(stepper.DRIVER, stepPin, dirPin);
 
 unsigned long currentPosition = 10000;
@@ -49,19 +51,37 @@ long hexstr2long(String hexstr)
 
 void setup() {
 
-  SoftSerial.begin(115200);           // initialize software serial for UART motor control
+  // SoftSerial.begin(115200);           // initialize software serial for UART motor control
   driver.beginSerial(115200);      // Initialize UART
-  driver.begin();                                                                                                                                                                                                                                                                                                                            // UART: Init SW UART (if selected) with default 115200 baudrate
-  driver.toff(5);                 // Enables driver in software
+  driver.begin();
+  driver.toff(5);
   driver.blank_time(24);
-  driver.rms_current(RMS_CURRENT);        // Set motor RMS current
-  driver.microsteps(16);         // Set microsteps
-  driver.en_spreadCycle(false);
-  driver.pwm_autoscale(true);     // Needed for stealthChop
-  driver.TCOOLTHRS(0xFFFFF);
-  driver.semin(5);
-  driver.semax(2);
-  driver.sedn(0b01);
+  driver.rms_current(RMS_CURRENT); // mA
+  driver.microsteps(8);         // Set microsteps
+  driver.TCOOLTHRS(0xFFFFF); // 20bit max
+  driver.seimin(1);                // minimum current for smart current control 0: 1/2 of IRUN 1: 1/4 of IRUN
+  driver.semin(15);                // [0... 15] If the StallGuard4 result falls below SEMIN*32, the motor current becomes increased to reduce motor load angle.
+  driver.semax(15);                // [0... 15]  If the StallGuard4 result is equal to or above (SEMIN+SEMAX+1)*32, the motor current becomes decreased to save energy.
+  driver.sedn(4);                  // current down step speed 0-11%
+  driver.iholddelay(3);            // 0 - 15 smooth current drop
+  driver.TPWMTHRS(0);        // 0: Disabled, 0xFFFFF = 1048575 MAX TSTEP.
+                                 // StealthChop PWM mode is enabled, if configured. When the velocity exceeds
+                                 // the limit set by TPWMTHRS, the driver switches to SpreadCycle.
+  driver.TCOOLTHRS(0);             // 0-7 TSTEP
+                                 // 0: TPWM_THRS= 0
+                                 // 1: TPWM_THRS= 200
+                                 // 2: TPWM_THRS= 300
+                                 // 3: TPWM_THRS= 400
+                                 // 4: TPWM_THRS= 500
+                                 // 5: TPWM_THRS= 800
+                                 // 6: TPWM_THRS= 1200
+                                 // 7: TPWM_THRS= 4000
+  driver.pwm_autoscale(true);      // Needed for stealthChop
+  driver.en_spreadCycle(false);    // false = StealthChop / true = SpreadCycle
+  //driver.intpol(true);             // interpolate to 256 microsteps
+
+  // driver.sedn(0b01);
+  driver.SGTHRS(STALL_VALUE);
 
 
   pinMode(stepPin, OUTPUT);
@@ -232,8 +252,13 @@ void loop() {
       nSpeedFactor = 32/hexstr2long(param);
       // SpeedFactor: smaller value means faster
       nSpeed = nSpeedConstant * nSpeedFactor;
-      stepper.setMaxSpeed(nSpeed);
-      stepper.setSpeed(nSpeed);
+      float s = targetPosition< stepper.currentPosition()?nSpeed*-1:nSpeed;
+      stepper.setMaxSpeed(s);
+      stepper.setSpeed(s);
+      stepper.setAcceleration(s);
+
+      // stepper.setMaxSpeed(nSpeed);
+      // stepper.setSpeed(nSpeed);
     }
 
 
@@ -293,10 +318,12 @@ void loop() {
     // initiate a move
     if (cmd.equalsIgnoreCase("FG"))
     {
-      driver.rms_current(RMS_CURRENT);
+      //driver.rms_current(RMS_CURRENT);
       stepper.disableOutputs();
-      stepper.setSpeed(targetPosition< stepper.currentPosition()?nSpeed*-1:nSpeed);
-      stepper.setAcceleration(targetPosition< stepper.currentPosition()?nSpeed*-1:nSpeed);
+      float s = targetPosition< stepper.currentPosition()?nSpeed*-1:nSpeed;
+      stepper.setMaxSpeed(s);
+      stepper.setSpeed(s);
+      stepper.setAcceleration(s);
 
       bSetToMove = true;
     }
