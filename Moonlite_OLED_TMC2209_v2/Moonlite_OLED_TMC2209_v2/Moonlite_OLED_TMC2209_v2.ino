@@ -28,12 +28,14 @@ bool eoc = false;
 bool bHalfStep = false;
 int LineLen= 0;
 String cmd, param, line;
-const long nSpeedConstant = 50;
+const long nSpeedConstant = 100;
 long nSpeedFactor = 10;
 long nSpeed = nSpeedConstant* nSpeedFactor;
 
 float tCoeff = 0;
 bool bSetToMove = false;
+long millisLastMove = 0;
+const long millisDisableDelay = 10000; // 10 sec
 
 
 long hexstr2long(String hexstr)
@@ -50,7 +52,7 @@ void setup() {
   driver.beginSerial(115200);      // Initialize UART
   driver.begin();                                                                                                                                                                                                                                                                                                                            // UART: Init SW UART (if selected) with default 115200 baudrate
   driver.toff(5);                 // Enables driver in software
-  driver.rms_current(800);        // Set motor RMS current
+  driver.rms_current(1200);        // Set motor RMS current
   driver.microsteps(16);         // Set microsteps
   driver.en_spreadCycle(false);
   driver.pwm_autoscale(true);     // Needed for stealthChop
@@ -284,6 +286,11 @@ void loop() {
     // initiate a move
     if (cmd.equalsIgnoreCase("FG"))
     {
+      driver.rms_current(1200);
+      stepper.disableOutputs();
+      stepper.setSpeed(targetPosition< stepper.currentPosition()?nSpeed*-1:nSpeed);
+      stepper.setAcceleration(targetPosition< stepper.currentPosition()?nSpeed*-1:nSpeed);
+
       bSetToMove = true;
     }
 
@@ -300,10 +307,25 @@ void loop() {
 
   if (stepper.distanceToGo()!=0 && bSetToMove)
   {
-    stepper.setSpeed( targetPosition< stepper.currentPosition()?nSpeed*-1:nSpeed);
-    stepper.runSpeed();
+    // stepper.setSpeed(targetPosition< stepper.currentPosition()?nSpeed*-1:nSpeed);
+    // stepper.setAcceleration(targetPosition< stepper.currentPosition()?nSpeed/-20:nSpeed/20);
+    // stepper.runSpeed();
+    stepper.run();
+    millisLastMove = millis();
   }
 
+  if (millis() - millisLastMove > millisDisableDelay)
+  {
+    // Save current location in EEPROM
+    if (lastSavedPosition != currentPosition)
+    {
+      EEPROM.put(0, currentPosition);
+      lastSavedPosition = currentPosition;
+    }
+    // set motor to sleep state
+    driver.rms_current(500);
+    stepper.enableOutputs();
+  }
 }
 
 
