@@ -54,7 +54,7 @@ void setup() {
   driver.GSTAT(0b111);
   driver.toff(5);
   driver.blank_time(24);
-  driver.rms_current(20); // mA
+  driver.rms_current(120); // mA
   driver.microsteps(32);         // Set microsteps
   driver.TCOOLTHRS(0x3FF); // 20bit max
   // driver.seimin(1);                // minimum current for smart current control 0: 1/2 of IRUN 1: 1/4 of IRUN
@@ -131,7 +131,7 @@ void loop()
   // }
   // stepper.run();
   
-  if (ms - last_time > 100)
+  if (ms - last_time > 50)
   {
   char buffer[128];
   snprintf(buffer, sizeof(buffer), "%u %u %u %u %u %u",driver.SG_RESULT(),driver.cs2rms(driver.cs_actual()),100 * digitalRead(DIAG_PIN),semin*32, (semin+semax+1)*32, sgthrs*2);
