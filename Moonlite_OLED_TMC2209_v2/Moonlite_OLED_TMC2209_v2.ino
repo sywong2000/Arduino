@@ -1,27 +1,50 @@
 #include <EEPROM.h>
 #include <TMCStepper.h>         // TMCstepper - https://github.com/teemuatlut/TMCStepper
 #include <AccelStepper.h>
-// #include <SoftwareSerial.h>     // Software serial for the UART to TMC2209 - https://www.arduino.cc/en/Reference/softwareSerial
 
 
-#define SW_SCK           5      // Software Slave Clock (SCK) - BLUE
-#define SW_TX            6      // SoftwareSerial receive pin - BROWN
-#define SW_RX            7      // SoftwareSerial transmit pin - YELLOW
+// TMC2209 pinout (left side  - target pin)
+// EN     - GPIO_3_A3
+// MS1    - N/A
+// MS2    - N/A
+// TX     - A4 GPIO_7
+// RX     - A3 GPIO_4
+// CLK    - A2 GPIO_2
+// STEP   - A1 GPIO_1
+// DIR    - A0 GPIO_0
+
+// ESP-C3 ABRobot 
+
+// 5V           |       |   GPIO_10
+// GND          |       |   GPIO_9_SCL (GPIO_6_OLED)
+// 3.3V         |       |   GPIO_8_SDA (GPIO_5_OLED)
+// RX GPIO20    |       |   GPIO_7_SS
+// TX GPIO21    |       |   GPIO_6_MOSI
+// A2 GPIO_2    |       |   GPIO_5_A5_MISO
+// A1 GPIO_1    |       |   GPIO_4_A4
+// A0 GPIO_0    |       |   GPIO_3_A3
+
+
+
+#define SW_SCK           5      // Software Slave Clock (SCK) 
+#define SW_TX            6      // SoftwareSerial receive pin 
+#define SW_RX            7      // SoftwareSerial transmit pin 
+#define ENABLE_PIN       12    
+#define STEP_PIN         4
+#define DIR_PIN          3
+
 #define DRIVER_ADDRESS   0b00   // TMC2209 Driver address according to MS1 and MS2
 #define R_SENSE 0.11f           // SilentStepStick series use 0.11 ...and so does my fysetc TMC2209 (?)
 #define RMS_CURRENT       50
 #define STALL_VALUE       100   // 0 - 255, higher value more sensitive
 
 
-const int enablePin = 12;
-const int stepPin = 4;
-const int dirPin = 3;
-const int ms1Pin = 8;
-const int ms2Pin = 9;
+// const int ms1Pin = 8;
+// const int ms2Pin = 9;
 
 // SoftwareSerial SoftSerial(SW_RX, SW_TX);                          // Be sure to connect RX to TX and TX to RX between both devices
 TMC2209Stepper driver(SW_RX, SW_TX, R_SENSE, DRIVER_ADDRESS);   // Create TMC driver
-AccelStepper stepper = AccelStepper(stepper.DRIVER, stepPin, dirPin);
+AccelStepper stepper = AccelStepper(stepper.DRIVER, STEP_PIN, DIR_PIN);
 
 unsigned long currentPosition = 10000;
 unsigned long targetPosition = 10000;
@@ -84,11 +107,11 @@ void setup() {
   driver.SGTHRS(STALL_VALUE);
 
 
-  pinMode(stepPin, OUTPUT);
-  pinMode(dirPin, OUTPUT);
-  pinMode(enablePin, OUTPUT);
+  pinMode(STEP_PIN, OUTPUT);
+  pinMode(DIR_PIN, OUTPUT);
+  pinMode(ENABLE_PIN, OUTPUT);
 
-  stepper.setEnablePin(enablePin);
+  stepper.setEnablePin(ENABLE_PIN);
   stepper.disableOutputs();
   stepper.setMaxSpeed(nSpeed);
   stepper.setSpeed(nSpeed);
