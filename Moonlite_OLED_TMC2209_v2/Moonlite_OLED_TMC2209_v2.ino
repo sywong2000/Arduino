@@ -2,7 +2,7 @@
 #include <TMCStepper.h>         // TMCstepper - https://github.com/teemuatlut/TMCStepper
 #include <AccelStepper.h>
 #include <U8g2lib.h>
-#include <Wire.h>
+// #include <Wire.h>
 
 
 // remember to comment 	-> if (_usbLineInfo.lineState > 0)	{
@@ -10,13 +10,22 @@
 // because the RTS and DTR needs to be disabled
 // not need for ESP32-C3 & UNO
 
+// PORT not exists
+// https://www.reddit.com/r/esp32/comments/109b5gp/how_do_i_solve_port_does_not_exist_error/
+// press and hold BOOT
+// press reset
+// release BOOT
+
+// Arduino compile settings for ESP32-C3
+// USB CDC On Boot: Enabled
+// JTAG Adapter: Integrated USB JTAG
 
 // TMC2209 pinout (c:\Users\sywong.manager\AppData\Local\Arduino15\packages\arduino\hardware\avr\1.8.6\cores\arduino\CDC.cppleft side  - target pin)
 // EN     - GPIO_3_A3
 // MS1    - N/A
 // MS2    - N/A
-// TX     - A5 GPIO_5
-// RX     - A4 GPIO_4
+// TX     - RX GPIO_20
+// RX     - TX GPIO_21
 // CLK    - A2 GPIO_2
 // STEP   - A1 GPIO_1
 // DIR    - A0 GPIO_0
@@ -41,7 +50,7 @@
 // #define STEP_PIN         4
 // #define DIR_PIN          3
 
-#define SW_SCK           A2
+// #define SW_SCK           A2
 // #define SW_TX            A5
 // #define SW_RX            A4
 #define ENABLE_PIN       A3    
@@ -51,7 +60,7 @@
 
 #define DRIVER_ADDRESS   0b00   // TMC2209 Driver address according to MS1 and MS2
 #define R_SENSE 0.11f           // SilentStepStick series use 0.11 ...and so does my fysetc TMC2209 (?)
-#define RMS_CURRENT       800
+#define RMS_CURRENT       800   // (RMS*sqrt(2) ~ max current consumption)
 #define STALL_VALUE       100   // 0 - 255, higher value more sensitive
 
 
@@ -61,9 +70,10 @@
 
 U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0,6,5,U8X8_PIN_NONE); //ESP32C3 OLED : scl-->gpio6  sda-->gpio5 
 
+
 // SoftwareSerial SoftSerial(SW_RX, SW_TX);                          // Be sure to connect RX to TX and TX to RX between both devices
 // TMC2209Stepper driver(SW_RX, SW_TX, R_SENSE, DRIVER_ADDRESS);   // Create TMC driver
-TMC2209Stepper driver(&Serial0, R_SENSE, DRIVER_ADDRESS); // ESP32 try uses Serial1
+TMC2209Stepper driver(&Serial0, R_SENSE, DRIVER_ADDRESS); // ESP32 try uses Serial0
 AccelStepper stepper = AccelStepper(stepper.DRIVER, STEP_PIN, DIR_PIN);
 
 unsigned long currentPosition = 10000;
@@ -72,6 +82,7 @@ unsigned long lastSavedPosition = 0;
 
 constexpr uint8_t semin = 6;
 constexpr uint8_t semax = 2;
+String OledDisplay = "";
 
 
 bool eoc = false;
@@ -98,10 +109,11 @@ long hexstr2long(String hexstr)
 
 void setup() {
 
-  u8g2.setContrast(300);
   u8g2.begin();
-  u8g2.setFont(u8g2_font_ncenB10_tr);
-  u8g2.drawStr(30,24,"START");
+  u8g2.setContrast(300);
+  // u8g2.clearBuffer();
+  // u8g2.drawStr(30,24,"INIT");
+  // u8g2.sendBuffer();
 
   // SoftSerial.begin(115200);           // initialize software serial for UART motor control
   Serial0.begin(115200);
@@ -160,13 +172,17 @@ void setup() {
   targetPosition = currentPosition;
 
   Serial.begin(9600);
-  u8g2.drawStr(30,24,"READY");
+  
 }
 
 
+int oled_last_refresh = millis();
+
 void loop() {
 
-  // process when end of commandc:\Users\sywong.manager\AppData\Local\Arduino15\packages\arduino\hardware\avr\1.8.6\cores\arduino\CDC.cpp
+  OledDisplay = "READY";
+
+  // process when end of command
   if (eoc)
   {
     if (line.startsWith("2"))
@@ -400,9 +416,20 @@ void loop() {
     // stepper.setSpeed(targetPosition< stepper.currentPosition()?nSpeed*-1:nSpeed);
     // stepper.setAcceleration(targetPosition< stepper.currentPosition()?nSpeed/-20:nSpeed/20);
     // stepper.runSpeed();
+    OledDisplay = "MOVING";
     stepper.run();
     millisLastMove = millis();
   }
+
+  
+  // if (millis()- oled_last_refresh > 500)
+  // {
+  //   u8g2.clearBuffer();
+  //   u8g2.setFont(u8g2_font_ncenB10_tr);
+  //   u8g2.drawStr(30,24,OledDisplay.c_str());
+  //   u8g2.sendBuffer();
+  //   oled_last_refresh = millis();
+  // }
 
   // if (millis() - millisLastMove > millisDisableDelay)
   // {
