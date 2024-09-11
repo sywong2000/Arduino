@@ -7,8 +7,8 @@
 // EN     - GPIO_3_A3
 // MS1    - N/A
 // MS2    - N/A
-// TX     - A4 GPIO_7
-// RX     - A3 GPIO_4
+// TX     - A5 GPIO_5
+// RX     - A4 GPIO_4
 // CLK    - A2 GPIO_2
 // STEP   - A1 GPIO_1
 // DIR    - A0 GPIO_0
@@ -26,12 +26,20 @@
 
 
 
-#define SW_SCK           5      // Software Slave Clock (SCK) 
-#define SW_TX            6      // SoftwareSerial receive pin 
-#define SW_RX            7      // SoftwareSerial transmit pin 
-#define ENABLE_PIN       12    
-#define STEP_PIN         4
-#define DIR_PIN          3
+// #define SW_SCK           5      // Software Slave Clock (SCK) 
+// #define SW_TX            6      // SoftwareSerial receive pin 
+// #define SW_RX            7      // SoftwareSerial transmit pin 
+// #define ENABLE_PIN       12    
+// #define STEP_PIN         4
+// #define DIR_PIN          3
+
+#define SW_SCK           A2
+#define SW_TX            A5
+#define SW_RX            A4
+#define ENABLE_PIN       A3    
+#define STEP_PIN         A1
+#define DIR_PIN          A0
+
 
 #define DRIVER_ADDRESS   0b00   // TMC2209 Driver address according to MS1 and MS2
 #define R_SENSE 0.11f           // SilentStepStick series use 0.11 ...and so does my fysetc TMC2209 (?)
