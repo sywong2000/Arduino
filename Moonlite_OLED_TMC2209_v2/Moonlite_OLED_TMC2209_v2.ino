@@ -1,9 +1,17 @@
-#include <EEPROM.h>
+// #include <EEPROM.h>
 #include <TMCStepper.h>         // TMCstepper - https://github.com/teemuatlut/TMCStepper
 #include <AccelStepper.h>
+#include <U8g2lib.h>
+#include <Wire.h>
 
 
-// TMC2209 pinout (left side  - target pin)
+// remember to comment 	-> if (_usbLineInfo.lineState > 0)	{
+// in serial:write function as workaround for Sparkfun Pro Micro board
+// because the RTS and DTR needs to be disabled
+// not need for ESP32-C3 & UNO
+
+
+// TMC2209 pinout (c:\Users\sywong.manager\AppData\Local\Arduino15\packages\arduino\hardware\avr\1.8.6\cores\arduino\CDC.cppleft side  - target pin)
 // EN     - GPIO_3_A3
 // MS1    - N/A
 // MS2    - N/A
@@ -34,8 +42,8 @@
 // #define DIR_PIN          3
 
 #define SW_SCK           A2
-#define SW_TX            A5
-#define SW_RX            A4
+// #define SW_TX            A5
+// #define SW_RX            A4
 #define ENABLE_PIN       A3    
 #define STEP_PIN         A1
 #define DIR_PIN          A0
@@ -43,20 +51,28 @@
 
 #define DRIVER_ADDRESS   0b00   // TMC2209 Driver address according to MS1 and MS2
 #define R_SENSE 0.11f           // SilentStepStick series use 0.11 ...and so does my fysetc TMC2209 (?)
-#define RMS_CURRENT       50
+#define RMS_CURRENT       800
 #define STALL_VALUE       100   // 0 - 255, higher value more sensitive
 
 
 // const int ms1Pin = 8;
 // const int ms2Pin = 9;
 
+
+U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0,6,5,U8X8_PIN_NONE); //ESP32C3 OLED : scl-->gpio6  sda-->gpio5 
+
 // SoftwareSerial SoftSerial(SW_RX, SW_TX);                          // Be sure to connect RX to TX and TX to RX between both devices
-TMC2209Stepper driver(SW_RX, SW_TX, R_SENSE, DRIVER_ADDRESS);   // Create TMC driver
+// TMC2209Stepper driver(SW_RX, SW_TX, R_SENSE, DRIVER_ADDRESS);   // Create TMC driver
+TMC2209Stepper driver(&Serial0, R_SENSE, DRIVER_ADDRESS); // ESP32 try uses Serial1
 AccelStepper stepper = AccelStepper(stepper.DRIVER, STEP_PIN, DIR_PIN);
 
 unsigned long currentPosition = 10000;
 unsigned long targetPosition = 10000;
 unsigned long lastSavedPosition = 0;
+
+constexpr uint8_t semin = 6;
+constexpr uint8_t semax = 2;
+
 
 bool eoc = false;
 bool bHalfStep = false;
@@ -82,34 +98,42 @@ long hexstr2long(String hexstr)
 
 void setup() {
 
+  u8g2.setContrast(300);
+  u8g2.begin();
+  u8g2.setFont(u8g2_font_ncenB10_tr);
+  u8g2.drawStr(30,24,"START");
+
   // SoftSerial.begin(115200);           // initialize software serial for UART motor control
-  driver.beginSerial(115200);      // Initialize UART
+  Serial0.begin(115200);
+  //driver.beginSerial(115200);      // Initialize UART
+  driver.GSTAT(0b111);
   driver.begin();
   driver.toff(5);
   driver.blank_time(24);
   driver.rms_current(RMS_CURRENT); // mA
   driver.microsteps(8);         // Set microsteps
-  driver.TCOOLTHRS(0xFFFFF); // 20bit max
-  driver.seimin(1);                // minimum current for smart current control 0: 1/2 of IRUN 1: 1/4 of IRUN
-  driver.semin(15);                // [0... 15] If the StallGuard4 result falls below SEMIN*32, the motor current becomes increased to reduce motor load angle.
-  driver.semax(15);                // [0... 15]  If the StallGuard4 result is equal to or above (SEMIN+SEMAX+1)*32, the motor current becomes decreased to save energy.
-  driver.sedn(4);                  // current down step speed 0-11%
-  driver.iholddelay(3);            // 0 - 15 smooth current drop
-  driver.TPWMTHRS(0);        // 0: Disabled, 0xFFFFF = 1048575 MAX TSTEP.
-                                 // StealthChop PWM mode is enabled, if configured. When the velocity exceeds
-                                 // the limit set by TPWMTHRS, the driver switches to SpreadCycle.
-  driver.TCOOLTHRS(0);             // 0-7 TSTEP
-                                 // 0: TPWM_THRS= 0
-                                 // 1: TPWM_THRS= 200
-                                 // 2: TPWM_THRS= 300
-                                 // 3: TPWM_THRS= 400
-                                 // 4: TPWM_THRS= 500
-                                 // 5: TPWM_THRS= 800
-                                 // 6: TPWM_THRS= 1200
-                                 // 7: TPWM_THRS= 4000
-  driver.pwm_autoscale(true);      // Needed for stealthChop
-  driver.en_spreadCycle(false);    // false = StealthChop / true = SpreadCycle
-  //driver.intpol(true);             // interpolate to 256 microsteps
+  driver.TCOOLTHRS(0x3FF); // 20bit max
+  // driver.seimin(1);                // minimum current for smart current control 0: 1/2 of IRUN 1: 1/4 of IRUN
+  driver.semin(semin);                // [0... 15] If the StallGuard4 result falls below SEMIN*32, the motor current becomes increased to reduce motor load angle.
+  driver.semax(semax);                // [0... 15]  If the StallGuard4 result is equal to or above (SEMIN+SEMAX+1)*32, the motor current becomes decreased to save energy.
+  driver.sedn(0b01);     // Set current reduction rate
+  driver.seup(0b01);     // Set current increase rate
+  // driver.iholddelay(3);            // 0 - 15 smooth current drop
+  // driver.TPWMTHRS(0);        // 0: Disabled, 0xFFFFF = 1048575 MAX TSTEP.
+  //                                // StealthChop PWM mode is enabled, if configured. When the velocity exceeds
+  //                                // the limit set by TPWMTHRS, the driver switches to SpreadCycle.
+  // driver.TCOOLTHRS(0);             // 0-7 TSTEP
+  //                                // 0: TPWM_THRS= 0
+  //                                // 1: TPWM_THRS= 200
+  //                                // 2: TPWM_THRS= 300
+  //                                // 3: TPWM_THRS= 400
+  //                                // 4: TPWM_THRS= 500
+  //                                // 5: TPWM_THRS= 800
+  //                                // 6: TPWM_THRS= 1200
+  //                                // 7: TPWM_THRS= 4000
+  // driver.pwm_autoscale(true);      // Needed for stealthChop
+  // driver.en_spreadCycle(false);    // false = StealthChop / true = SpreadCycle
+  driver.intpol(true);             // interpolate to 256 microsteps
 
   // driver.sedn(0b01);
   driver.SGTHRS(STALL_VALUE);
@@ -126,22 +150,23 @@ void setup() {
 
   // init position from EEPROM
   // default position is 10000
-  EEPROM.get(0, currentPosition);
-  if (isnan(currentPosition) || currentPosition<0 || currentPosition>65535)
-  {
-    EEPROM.put(0, (long)10000);
-  }
-  stepper.setCurrentPosition(currentPosition);
+  // EEPROM.get(0, currentPosition);c:\Users\sywong.manager\AppData\Local\Arduino15\packages\arduino\hardware\avr\1.8.6\cores\arduino\CDC.cpp
+  // if (isnan(currentPosition) || currentPosition<0 || currentPosition>65535)
+  // {
+  //   EEPROM.put(0, (long)10000);
+  // }
+  stepper.setCurrentPosition  (currentPosition);
   lastSavedPosition = currentPosition;
   targetPosition = currentPosition;
 
   Serial.begin(9600);
+  u8g2.drawStr(30,24,"READY");
 }
 
 
 void loop() {
 
-  // process when end of command
+  // process when end of commandc:\Users\sywong.manager\AppData\Local\Arduino15\packages\arduino\hardware\avr\1.8.6\cores\arduino\CDC.cpp
   if (eoc)
   {
     if (line.startsWith("2"))
@@ -286,7 +311,7 @@ void loop() {
       float s = targetPosition< stepper.currentPosition()?nSpeed*-1:nSpeed;
       stepper.setMaxSpeed(s);
       stepper.setSpeed(s);
-      stepper.setAcceleration(s);
+      stepper.setAcceleration(50000);
 
       // stepper.setMaxSpeed(nSpeed);
       // stepper.setSpeed(nSpeed);
@@ -349,12 +374,12 @@ void loop() {
     // initiate a move
     if (cmd.equalsIgnoreCase("FG"))
     {
-      //driver.rms_current(RMS_CURRENT);
+      //drc:\git\github\Arduino\ABRobot_ESP32_C3_OLED_Test\ABRobot_ESP32_C3_OLED_Test.inoiver.rms_current(RMS_CURRENT);
       stepper.disableOutputs();
       float s = targetPosition< stepper.currentPosition()?nSpeed*-1:nSpeed;
       stepper.setMaxSpeed(s);
       stepper.setSpeed(s);
-      stepper.setAcceleration(s);
+      stepper.setAcceleration(50000);
 
       bSetToMove = true;
     }
