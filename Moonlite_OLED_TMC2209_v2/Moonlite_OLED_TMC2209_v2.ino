@@ -1,8 +1,11 @@
 // #include <EEPROM.h>
 #include <TMCStepper.h>         // TMCstepper - https://github.com/teemuatlut/TMCStepper
 #include <AccelStepper.h>
-#include <U8g2lib.h>
-// #include <Wire.h>
+#include <Wire.h>
+#include "SSD1306Ascii.h"
+#include "SSD1306AsciiWire.h"
+#include "EEPROM.h"
+
 
 
 // remember to comment 	-> if (_usbLineInfo.lineState > 0)	{
@@ -58,17 +61,18 @@
 #define DIR_PIN          A0
 
 
-#define DRIVER_ADDRESS   0b00   // TMC2209 Driver address according to MS1 and MS2
-#define R_SENSE 0.11f           // SilentStepStick series use 0.11 ...and so does my fysetc TMC2209 (?)
-#define RMS_CURRENT       800   // (RMS*sqrt(2) ~ max current consumption)
-#define STALL_VALUE       100   // 0 - 255, higher value more sensitive
+#define DRIVER_ADDRESS    0b00    // TMC2209 Driver address according to MS1 and MS2
+#define R_SENSE           0.11f   // SilentStepStick series use 0.11 ...and so does my fysetc TMC2209 (?)
+#define RMS_CURRENT       800     // (RMS*sqrt(2) ~ max current consumption)
+#define STALL_VALUE       100     // 0 - 255, higher value more sensitive
 
 
 // const int ms1Pin = 8;
 // const int ms2Pin = 9;
 
-
-U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0,6,5,U8X8_PIN_NONE); //ESP32C3 OLED : scl-->gpio6  sda-->gpio5 
+#define WIRE Wire
+#define I2C_ADDRESS 0x3C
+SSD1306AsciiWire oled;
 
 
 // SoftwareSerial SoftSerial(SW_RX, SW_TX);                          // Be sure to connect RX to TX and TX to RX between both devices
@@ -109,11 +113,13 @@ long hexstr2long(String hexstr)
 
 void setup() {
 
-  u8g2.begin();
-  u8g2.setContrast(300);
-  // u8g2.clearBuffer();
-  // u8g2.drawStr(30,24,"INIT");
-  // u8g2.sendBuffer();
+  // init OLED with SSD1306 ASCII lib
+  Wire.begin(5,6);
+  oled.begin(&Adafruit128x64, I2C_ADDRESS);
+  oled.clear();
+  oled.ssd1306WriteCmd(SSD1306_SEGREMAP);
+  oled.ssd1306WriteCmd(SSD1306_COMSCANINC);
+  oled.setFont(Callibri15);
 
   // SoftSerial.begin(115200);           // initialize software serial for UART motor control
   Serial0.begin(115200);
@@ -123,7 +129,7 @@ void setup() {
   driver.toff(5);
   driver.blank_time(24);
   driver.rms_current(RMS_CURRENT); // mA
-  driver.microsteps(8);         // Set microsteps
+  driver.microsteps(32);         // Set microsteps
   driver.TCOOLTHRS(0x3FF); // 20bit max
   // driver.seimin(1);                // minimum current for smart current control 0: 1/2 of IRUN 1: 1/4 of IRUN
   driver.semin(semin);                // [0... 15] If the StallGuard4 result falls below SEMIN*32, the motor current becomes increased to reduce motor load angle.
@@ -150,7 +156,6 @@ void setup() {
   // driver.sedn(0b01);
   driver.SGTHRS(STALL_VALUE);
 
-
   pinMode(STEP_PIN, OUTPUT);
   pinMode(DIR_PIN, OUTPUT);
   pinMode(ENABLE_PIN, OUTPUT);
@@ -162,11 +167,11 @@ void setup() {
 
   // init position from EEPROM
   // default position is 10000
-  // EEPROM.get(0, currentPosition);c:\Users\sywong.manager\AppData\Local\Arduino15\packages\arduino\hardware\avr\1.8.6\cores\arduino\CDC.cpp
-  // if (isnan(currentPosition) || currentPosition<0 || currentPosition>65535)
-  // {
-  //   EEPROM.put(0, (long)10000);
-  // }
+  EEPROM.get(0, currentPosition);
+  if (isnan(currentPosition) || currentPosition<0 || currentPosition>65535)
+  {
+    EEPROM.put(0, (long)10000);
+  }
   stepper.setCurrentPosition  (currentPosition);
   lastSavedPosition = currentPosition;
   targetPosition = currentPosition;
@@ -180,7 +185,7 @@ int oled_last_refresh = millis();
 
 void loop() {
 
-  OledDisplay = "READY";
+  OledDisplay = "READY    ";
 
   // process when end of command
   if (eoc)
@@ -390,7 +395,6 @@ void loop() {
     // initiate a move
     if (cmd.equalsIgnoreCase("FG"))
     {
-      //drc:\git\github\Arduino\ABRobot_ESP32_C3_OLED_Test\ABRobot_ESP32_C3_OLED_Test.inoiver.rms_current(RMS_CURRENT);
       stepper.disableOutputs();
       float s = targetPosition< stepper.currentPosition()?nSpeed*-1:nSpeed;
       stepper.setMaxSpeed(s);
@@ -422,27 +426,26 @@ void loop() {
   }
 
   
-  // if (millis()- oled_last_refresh > 500)
-  // {
-  //   u8g2.clearBuffer();
-  //   u8g2.setFont(u8g2_font_ncenB10_tr);
-  //   u8g2.drawStr(30,24,OledDisplay.c_str());
-  //   u8g2.sendBuffer();
-  //   oled_last_refresh = millis();
-  // }
+  if (millis()- oled_last_refresh > 200)
+  {
+    oled.setRow(2);
+    oled.setCol(36);
+    oled.print(OledDisplay);
+    oled_last_refresh = millis();
+  }
 
-  // if (millis() - millisLastMove > millisDisableDelay)
-  // {
-  //   // Save current location in EEPROM
-  //   if (lastSavedPosition != currentPosition)
-  //   {
-  //     EEPROM.put(0, currentPosition);
-  //     lastSavedPosition = currentPosition;
-  //   }
-  //   // set motor to sleep state
-  //   driver.rms_current(500);
-  //   stepper.enableOutputs();
-  // }
+  if (millis() - millisLastMove > millisDisableDelay)
+  {
+    // Save current location in EEPROM
+    if (lastSavedPosition != currentPosition)
+    {
+      EEPROM.put(0, currentPosition);
+      lastSavedPosition = currentPosition;
+    }
+    // set motor to sleep state
+    driver.rms_current(500);
+    stepper.enableOutputs();
+  }
 }
 
 
