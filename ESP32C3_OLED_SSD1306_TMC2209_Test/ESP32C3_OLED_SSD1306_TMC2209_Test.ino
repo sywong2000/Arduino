@@ -37,13 +37,13 @@ int nStallCnt = 0;
 #define DRIVER_ADDRESS   0b00   // TMC2209 Driver address according to MS1 and MS2
 #define R_SENSE 0.11f           // SilentStepStick series use 0.11 ...and so does my fysetc TMC2209 (?)
 #define STALL_VALUE     10 // [0..255]
-#define DIAG_PIN        A5
+#define DIAG_PIN        A4
 #define TOFF_VALUE        4 // [1... 15]
 
 
 //int DIAG_PIN  = A0;
 constexpr uint8_t sgthrs = STALL_VALUE;
-constexpr uint8_t semin = 5;
+constexpr uint8_t semin = 8;
 constexpr uint8_t semax = 2;
 
 // Create a new instance of the AccelStepper class:
@@ -92,6 +92,7 @@ void setup() {
   // loads, a setting of 32 or 40 will be required.
   driver.blank_time(24);
 
+  // driver.rms_current(3000); // mA
   driver.rms_current(3000); // mA
   driver.microsteps(32);         // Set microsteps
   // driver.seimin(1);                // minimum current for smart current control 0: 1/2 of IRUN 1: 1/4 of IRUN
@@ -110,8 +111,14 @@ void setup() {
   
   // Sets the number of StallGuard2 readings above the upper threshold necessary
   // for each current decrement of the motor current.
+
+  // %00: For each 32 StallGuard4 values decrease by one
+  // %01: For each 8 StallGuard4 values decrease by one
+  // %10: For each 2 StallGuard4 values decrease by one
+  // %11: For each StallGuard4 value decrease by one
+  
   driver.sedn(0b01);     // Set current reduction rate
-  // driver.seup(0b01);     // Set current increase rate
+  driver.seup(0b01);     // Set current increase rate
   // driver.TPWMTHRS(0);        // 0: Disabled, 0xFFFFF = 1048575 MAX TSTEP.
   //                                // StealthChop PWM mode is enabled, if configured. When the velocity exceeds
   //                                // the limit set by TPWMTHRS, the driver switches to SpreadCycle.
@@ -131,7 +138,8 @@ void setup() {
   // driver.en_spreadCycle(false);    // false = StealthChop / true = SpreadCycle
   driver.intpol(true);             // interpolate to 256 microsteps
   driver.SGTHRS(STALL_VALUE);
-  //attachInterrupt(digitalPinToInterrupt(DIAG_PIN), stallInterruptFunc, RISING);
+  driver.ihold(10);
+  attachInterrupt(digitalPinToInterrupt(DIAG_PIN), stallInterruptFunc, RISING);
   pinMode(DIAG_PIN, INPUT);
 
 
@@ -169,6 +177,7 @@ long int t1, t2, d;
 
 
 bool stalled = false;
+int stalled_count = 0;
 bool resetting = false;
 bool shaft = true;
 int count = 0;
@@ -186,16 +195,19 @@ void loop()
   // }
   // stepper.run();
   
-  if (ms - last_time > 50)
+  if (ms - last_time > 25)
   {
     oled.setFont(Callibri15);
-    oled.setRow(30);
-    oled.setCol(0);
+    oled.setRow(2);
+    oled.setCol(30);
     oled.print("RUNNING." + String(count++));
+    oled.setRow(4);
+    oled.setCol(30);
+    oled.print("STALL=" + String(stalled_count));
 
     char buffer[128];
     // Serial.println("StallGuard_value Actual_current Diag_pin semin semax sgthrs");
-    snprintf(buffer, sizeof(buffer), "StallGuard_value:%u  Actual_current:%u Diag_Pin:%u Semin:%u SeMax:%u SGTHRS:%u",driver.SG_RESULT(),driver.cs2rms(driver.cs_actual()),100 * digitalRead(DIAG_PIN) * 100,semin*32, (semin+semax+1)*32, sgthrs*2);
+    snprintf(buffer, sizeof(buffer), "StallGuard_value:%u  Actual_current:%u Diag_Pin:%u Semin:%u SeMax:%u SGTHRS:%u",driver.SG_RESULT(),driver.cs2rms(driver.cs_actual()),100 * digitalRead(DIAG_PIN),semin*32, (semin+semax+1)*32, sgthrs*2);
     Serial.println(buffer);
     last_time = millis();
   }
@@ -213,4 +225,5 @@ void loop()
 void stallInterruptFunc(){ // flag set for motor A when motor stalls
     //Serial.println("Stalled..." + String(nStallCnt++));
     stalled = true;
+    stalled_count++;
 }
