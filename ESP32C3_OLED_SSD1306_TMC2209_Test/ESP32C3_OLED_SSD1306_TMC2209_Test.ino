@@ -43,8 +43,8 @@ int nStallCnt = 0;
 
 //int DIAG_PIN  = A0;
 constexpr uint8_t sgthrs = STALL_VALUE;
-constexpr uint8_t semin = 8;
-constexpr uint8_t semax = 2;
+constexpr uint8_t semin = 7;
+constexpr uint8_t semax = 1;
 
 // Create a new instance of the AccelStepper class:
 // SoftwareSerial SoftSerial(SW_RX, SW_TX);                          // Be sure to connect RX to TX and TX to RX between both devices
@@ -93,8 +93,8 @@ void setup() {
   driver.blank_time(24);
 
   // driver.rms_current(3000); // mA
-  driver.rms_current(3000); // mA
-  driver.microsteps(32);         // Set microsteps
+  driver.rms_current(100); // mA
+  driver.microsteps(8);         // Set microsteps
   // driver.seimin(1);                // minimum current for smart current control 0: 1/2 of IRUN 1: 1/4 of IRUN
 
   // CoolStep lower threshold [0... 15].
@@ -117,7 +117,7 @@ void setup() {
   // %10: For each 2 StallGuard4 values decrease by one
   // %11: For each StallGuard4 value decrease by one
   
-  driver.sedn(0b01);     // Set current reduction rate
+  driver.sedn(0b11);     // Set current reduction rate
   driver.seup(0b01);     // Set current increase rate
   // driver.TPWMTHRS(0);        // 0: Disabled, 0xFFFFF = 1048575 MAX TSTEP.
   //                                // StealthChop PWM mode is enabled, if configured. When the velocity exceeds
@@ -125,7 +125,7 @@ void setup() {
 
   // Lower threshold velocity for switching on smart energy CoolStep and StallGuard to DIAG output
   driver.TCOOLTHRS(0xFFFFF); // 20bit max
-  // driver.TCOOLTHRS(0);             // 0-7 TSTEP
+  // driver.TCOOLTHRS(0x3FF);             // 0-7 TSTEP
   //                                // 0: TPWM_THRS= 0
   //                                // 1: TPWM_THRS= 200
   //                                // 2: TPWM_THRS= 300
@@ -134,11 +134,13 @@ void setup() {
   //                                // 5: TPWM_THRS= 800
   //                                // 6: TPWM_THRS= 1200
   //                                // 7: TPWM_THRS= 4000
-  // driver.pwm_autoscale(true);      // Needed for stealthChop
-  // driver.en_spreadCycle(false);    // false = StealthChop / true = SpreadCycle
+  driver.pwm_autoscale(true);      // Needed for stealthChop
+  driver.en_spreadCycle(false);    // false = StealthChop / true = SpreadCycle
   driver.intpol(true);             // interpolate to 256 microsteps
   driver.SGTHRS(STALL_VALUE);
-  driver.ihold(10);
+  driver.ihold(2);
+  driver.irun(31);
+
   attachInterrupt(digitalPinToInterrupt(DIAG_PIN), stallInterruptFunc, RISING);
   pinMode(DIAG_PIN, INPUT);
 
@@ -162,7 +164,7 @@ void setup() {
   // stepper.setCurrentPosition(0);
   // Serial.print("driver.SGTHRS = ");
   // Serial.println(driver.SGTHRS());
-  driver.VACTUAL(4000);
+  // driver.VACTUAL(10000);
 
   // digitalWrite(enablePin, HIGH);
   // stepper.disableOutputs();
@@ -195,7 +197,7 @@ void loop()
   // }
   // stepper.run();
   
-  if (ms - last_time > 25)
+  if (ms - last_time > 5)
   {
     oled.setFont(Callibri15);
     oled.setRow(2);
@@ -211,13 +213,21 @@ void loop()
     Serial.println(buffer);
     last_time = millis();
   }
+  
   if (ms - last_time2 > 3000)
   { 
-    driver.VACTUAL(0);
-    delay(1500);
-    shaft = ! shaft;
-    driver.shaft(shaft);
-    driver.VACTUAL(4000);
+    if (driver.VACTUAL()!=0)
+    {
+      driver.VACTUAL(0);
+    }
+    else
+    {
+      shaft = ! shaft;
+      driver.shaft(shaft);
+      driver.VACTUAL(nSpeed);
+    }
+    // delay(1500);
+    
     last_time2 = millis();
   }
 }
