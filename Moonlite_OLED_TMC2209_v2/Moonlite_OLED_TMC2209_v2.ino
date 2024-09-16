@@ -56,14 +56,15 @@
 // #define SW_SCK           A2
 // #define SW_TX            A5
 // #define SW_RX            A4
-#define ENABLE_PIN       A3    
-#define STEP_PIN         A1
-#define DIR_PIN          A0
-
+#define ENABLE_PIN        A3    
+#define STEP_PIN          A1
+#define DIR_PIN           A0
+#define HALF_STEP         32
+#define FULL_STEP         16
 
 #define DRIVER_ADDRESS    0b00    // TMC2209 Driver address according to MS1 and MS2
 #define R_SENSE           0.11f   // SilentStepStick series use 0.11 ...and so does my fysetc TMC2209 (?)
-#define RMS_CURRENT       800     // (RMS*sqrt(2) ~ max current consumption)
+#define RMS_CURRENT       1700    // (RMS*sqrt(2) ~ max current consumption)
 #define STALL_VALUE       100     // 0 - 255, higher value more sensitive
 
 
@@ -115,10 +116,12 @@ void setup() {
 
   // init OLED with SSD1306 ASCII lib
   Wire.begin(5,6);
+  Wire.setClock(400000);
   oled.begin(&Adafruit128x64, I2C_ADDRESS);
   oled.clear();
   oled.ssd1306WriteCmd(SSD1306_SEGREMAP);
   oled.ssd1306WriteCmd(SSD1306_COMSCANINC);
+  oled.setContrast(255);
   oled.setFont(Callibri15);
 
   // SoftSerial.begin(115200);           // initialize software serial for UART motor control
@@ -129,15 +132,17 @@ void setup() {
   driver.toff(5);
   driver.blank_time(24);
   driver.rms_current(RMS_CURRENT); // mA
-  driver.microsteps(32);         // Set microsteps
+  driver.microsteps(FULL_STEP);         // Set microsteps
   driver.TCOOLTHRS(0x3FF); // 20bit max
   // driver.seimin(1);                // minimum current for smart current control 0: 1/2 of IRUN 1: 1/4 of IRUN
   driver.semin(semin);                // [0... 15] If the StallGuard4 result falls below SEMIN*32, the motor current becomes increased to reduce motor load angle.
   driver.semax(semax);                // [0... 15]  If the StallGuard4 result is equal to or above (SEMIN+SEMAX+1)*32, the motor current becomes decreased to save energy.
-  driver.sedn(0b01);     // Set current reduction rate
-  driver.seup(0b01);     // Set current increase rate
-  // driver.iholddelay(3);            // 0 - 15 smooth current drop
-  // driver.TPWMTHRS(0);        // 0: Disabled, 0xFFFFF = 1048575 MAX TSTEP.
+  driver.sedn(0b01);      // Set current reduction rate
+  driver.seup(0b01);      // Set current increase rate
+  driver.irun(31);
+  driver.ihold(0);               // hold current  0=1/32 … 31=32/32
+  driver.iholddelay(2);            // 0 - 15 smooth current drop
+  // driver.TPWMTHRS(0);          // 0: Disabled, 0xFFFFF = 1048575 MAX TSTEP.
   //                                // StealthChop PWM mode is enabled, if configured. When the velocity exceeds
   //                                // the limit set by TPWMTHRS, the driver switches to SpreadCycle.
   // driver.TCOOLTHRS(0);             // 0-7 TSTEP
@@ -149,8 +154,8 @@ void setup() {
   //                                // 5: TPWM_THRS= 800
   //                                // 6: TPWM_THRS= 1200
   //                                // 7: TPWM_THRS= 4000
-  // driver.pwm_autoscale(true);      // Needed for stealthChop
-  // driver.en_spreadCycle(false);    // false = StealthChop / true = SpreadCycle
+  driver.pwm_autoscale(true);      // Needed for stealthChop
+  driver.en_spreadCycle(false);    // false = StealthChop / true = SpreadCycle
   driver.intpol(true);             // interpolate to 256 microsteps
 
   // driver.sedn(0b01);
@@ -177,7 +182,6 @@ void setup() {
   targetPosition = currentPosition;
 
   Serial.begin(9600);
-  
 }
 
 
@@ -356,14 +360,14 @@ void loop() {
     if (cmd.equalsIgnoreCase("SF"))
     {
       bHalfStep = false;
-      driver.microsteps(8);         // Set microsteps
+      driver.microsteps(FULL_STEP);
     }
 
     // half step
     if (cmd.equalsIgnoreCase("SH"))
     {
       bHalfStep = true;
-      driver.microsteps(16);
+      driver.microsteps(HALF_STEP);
     }
 
     // GI - is Motor Moving
@@ -395,12 +399,16 @@ void loop() {
     // initiate a move
     if (cmd.equalsIgnoreCase("FG"))
     {
+      OledDisplay = "MOVING";
+      oled.setRow(2);
+      oled.setCol(36);
+      oled.print(OledDisplay);
+
       stepper.disableOutputs();
       float s = targetPosition< stepper.currentPosition()?nSpeed*-1:nSpeed;
       stepper.setMaxSpeed(s);
       stepper.setSpeed(s);
       stepper.setAcceleration(50000);
-
       bSetToMove = true;
     }
 
@@ -426,7 +434,7 @@ void loop() {
   }
 
   
-  if (millis()- oled_last_refresh > 200)
+  if (millis()- oled_last_refresh > 50 && (!bSetToMove|| stepper.distanceToGo()==0))
   {
     oled.setRow(2);
     oled.setCol(36);
@@ -442,9 +450,6 @@ void loop() {
       EEPROM.put(0, currentPosition);
       lastSavedPosition = currentPosition;
     }
-    // set motor to sleep state
-    driver.rms_current(500);
-    stepper.enableOutputs();
   }
 }
 

@@ -43,8 +43,8 @@ int nStallCnt = 0;
 
 //int DIAG_PIN  = A0;
 constexpr uint8_t sgthrs = STALL_VALUE;
-constexpr uint8_t semin = 7;
-constexpr uint8_t semax = 1;
+constexpr uint8_t semin = 3;
+constexpr uint8_t semax = 2;
 
 // Create a new instance of the AccelStepper class:
 // SoftwareSerial SoftSerial(SW_RX, SW_TX);                          // Be sure to connect RX to TX and TX to RX between both devices
@@ -94,7 +94,7 @@ void setup() {
 
   // driver.rms_current(3000); // mA
   driver.rms_current(100); // mA
-  driver.microsteps(8);         // Set microsteps
+  driver.microsteps(64);         // Set microsteps
   // driver.seimin(1);                // minimum current for smart current control 0: 1/2 of IRUN 1: 1/4 of IRUN
 
   // CoolStep lower threshold [0... 15].
@@ -117,8 +117,8 @@ void setup() {
   // %10: For each 2 StallGuard4 values decrease by one
   // %11: For each StallGuard4 value decrease by one
   
-  driver.sedn(0b11);     // Set current reduction rate
-  driver.seup(0b01);     // Set current increase rate
+  driver.sedn(0b10);     // Set current reduction rate
+  driver.seup(0b10);     // Set current increase rate
   // driver.TPWMTHRS(0);        // 0: Disabled, 0xFFFFF = 1048575 MAX TSTEP.
   //                                // StealthChop PWM mode is enabled, if configured. When the velocity exceeds
   //                                // the limit set by TPWMTHRS, the driver switches to SpreadCycle.
@@ -183,12 +183,66 @@ int stalled_count = 0;
 bool resetting = false;
 bool shaft = true;
 int count = 0;
-
+String readString ;
+uint32_t ms = millis();
 void loop()
 {
   static uint32_t last_time=0;
   static uint32_t last_time2=0;
-  uint32_t ms = millis();
+  ms = millis();
+
+ while (Serial.available()) {
+    //delay(3);  //delay to allow buffer to fill 
+    if (Serial.available() >0) {
+      readString =  Serial.readStringUntil('\n');
+    } 
+  }
+
+  int nCol = readString.indexOf(":");
+  if (nCol>0)
+  {
+    String cmd = readString.substring(0,nCol);
+    String val = readString.substring(nCol+1);
+    double d = val.toDouble();
+    if (cmd=="semin")
+    {
+      driver.semin((int)d);
+    }
+    else if (cmd=="semax")
+    {
+      driver.semax((int)d);
+    }
+    else if (cmd=="sg")
+    {
+      driver.SGTHRS((int)d);
+    }
+    else if (cmd=="seup")
+    {
+      driver.seup((int)d);
+    }
+    else if (cmd=="sedn")
+    {
+      driver.sedn((int)d);
+    }
+    else if (cmd=="rms")
+    {
+      driver.rms_current((int)d);
+    }
+    else if (cmd=="TPWMTHRS")
+    {
+      driver.TPWMTHRS((int)d);
+    }
+    else if (cmd == "TCOOLTHRS") {
+			driver.TCOOLTHRS((int)d);
+		}
+    else if (cmd == "ihold") {
+			driver.ihold((int)d);
+		}
+    else if (cmd == "irun") {
+			driver.irun((int)d);
+		}
+    readString= "";
+  }
 
   // if (stepper.distanceToGo()==0)
   // {
@@ -197,7 +251,7 @@ void loop()
   // }
   // stepper.run();
   
-  if (ms - last_time > 5)
+  if (ms - last_time > 1)
   {
     oled.setFont(Callibri15);
     oled.setRow(2);
@@ -209,7 +263,7 @@ void loop()
 
     char buffer[128];
     // Serial.println("StallGuard_value Actual_current Diag_pin semin semax sgthrs");
-    snprintf(buffer, sizeof(buffer), "StallGuard_value:%u  Actual_current:%u Diag_Pin:%u Semin:%u SeMax:%u SGTHRS:%u",driver.SG_RESULT(),driver.cs2rms(driver.cs_actual()),100 * digitalRead(DIAG_PIN),semin*32, (semin+semax+1)*32, sgthrs*2);
+    snprintf(buffer, sizeof(buffer), "StallGuard_value:%u  Actual_current:%u Diag_Pin:%u Semin:%u SeMax:%u SGTHRS:%u",driver.SG_RESULT(),driver.cs2rms(driver.cs_actual()),100 * digitalRead(DIAG_PIN),driver.semin()*32, (driver.semin()+driver.semax()+1)*32, driver.SGTHRS()*2);
     Serial.println(buffer);
     last_time = millis();
   }
