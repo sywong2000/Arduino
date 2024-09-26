@@ -428,6 +428,9 @@ void loop() {
       // e.g. :SI0500$ - set to 500mA
       int nCurrent = param.toInt();
       driver.rms_current(nCurrent);
+      // driver.irun(31);
+      driver.ihold(0);
+      driver.iholddelay(2);
     }
 
 
