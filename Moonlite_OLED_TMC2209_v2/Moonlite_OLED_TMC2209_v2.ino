@@ -419,6 +419,18 @@ void loop() {
       stepper.stop();
     
     }
+
+    // non-standard commands
+
+    if (cmd.equalsIgnoreCase("SI"))
+    {
+      // set RMS current
+      // e.g. :SI0500$ - set to 500mA
+      int nCurrent = param.toInt();
+      driver.rms_current(nCurrent);
+    }
+
+
     line = "";
     eoc = false;
   }  // eoc == true
