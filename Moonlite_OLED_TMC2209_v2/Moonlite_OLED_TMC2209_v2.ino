@@ -88,6 +88,7 @@ unsigned long lastSavedPosition = 0;
 constexpr uint8_t semin = 6;
 constexpr uint8_t semax = 2;
 String OledDisplay = "";
+String OledDisplayed = "";
 
 
 bool eoc = false;
@@ -182,14 +183,15 @@ void setup() {
   targetPosition = currentPosition;
 
   Serial.begin(9600);
+  OledDisplay = "READY    ";
+  updateOLED();
 }
-
 
 int oled_last_refresh = millis();
 
 void loop() {
 
-  OledDisplay = "READY    ";
+  // OledDisplay = "READY    ";
 
   // process when end of command
   if (eoc)
@@ -400,9 +402,7 @@ void loop() {
     if (cmd.equalsIgnoreCase("FG"))
     {
       OledDisplay = "MOVING";
-      oled.setRow(2);
-      oled.setCol(36);
-      oled.print(OledDisplay);
+      updateOLED();
 
       stepper.disableOutputs();
       float s = targetPosition< stepper.currentPosition()?nSpeed*-1:nSpeed;
@@ -443,19 +443,24 @@ void loop() {
     // stepper.setSpeed(targetPosition< stepper.currentPosition()?nSpeed*-1:nSpeed);
     // stepper.setAcceleration(targetPosition< stepper.currentPosition()?nSpeed/-20:nSpeed/20);
     // stepper.runSpeed();
-    OledDisplay = "MOVING";
     stepper.run();
     millisLastMove = millis();
   }
 
-  
-  if (millis()- oled_last_refresh > 50 && (!bSetToMove|| stepper.distanceToGo()==0))
+  if (stepper.distanceToGo()==0)
   {
-    oled.setRow(2);
-    oled.setCol(36);
-    oled.print(OledDisplay);
-    oled_last_refresh = millis();
+    OledDisplay = "READY    ";
+    updateOLED();
   }
+
+  
+  // if (millis()- oled_last_refresh > 50 && (!bSetToMove|| stepper.distanceToGo()==0))
+  // {
+  //   oled.setRow(2);
+  //   oled.setCol(36);
+  //   oled.print(OledDisplay);
+  //   oled_last_refresh = millis();
+  // }
 
   if (millis() - millisLastMove > millisDisableDelay)
   {
@@ -468,6 +473,16 @@ void loop() {
   }
 }
 
+void updateOLED()
+{
+    if (OledDisplay != OledDisplayed)
+    {
+      oled.setRow(2);
+      oled.setCol(36);
+      oled.print(OledDisplay);
+      OledDisplayed = OledDisplay;
+    }
+}
 
 // For sparkfun pro micro
 void serialEventRun(void) {
