@@ -65,6 +65,7 @@
 #define DRIVER_ADDRESS    0b00    // TMC2209 Driver address according to MS1 and MS2
 #define R_SENSE           0.11f   // SilentStepStick series use 0.11 ...and so does my fysetc TMC2209 (?)
 #define RMS_CURRENT       1700    // (RMS*sqrt(2) ~ max current consumption)
+#define IDLE_RMS_CURRENT  200     // Idle Current
 #define STALL_VALUE       100     // 0 - 255, higher value more sensitive
 
 
@@ -101,8 +102,12 @@ long nSpeed = nSpeedConstant* nSpeedFactor;
 
 float tCoeff = 0;
 bool bSetToMove = false;
+bool bSetIdle = false;
 long millisLastMove = 0;
-const long millisDisableDelay = 10000; // 10 sec
+const long millisIdleDelay = 5000; // 10 sec
+
+int nCurrent = RMS_CURRENT;
+int nLastPollByClient = 0;
 
 
 long hexstr2long(String hexstr)
@@ -132,7 +137,7 @@ void setup() {
   driver.begin();
   driver.toff(5);
   driver.blank_time(24);
-  driver.rms_current(RMS_CURRENT); // mA
+  driver.rms_current(RMS_CURRENT);      // set the initial mA
   driver.microsteps(FULL_STEP);         // Set microsteps
   driver.TCOOLTHRS(0x3FF); // 20bit max
   // driver.seimin(1);                // minimum current for smart current control 0: 1/2 of IRUN 1: 1/4 of IRUN
@@ -183,15 +188,13 @@ void setup() {
   targetPosition = currentPosition;
 
   Serial.begin(9600);
-  OledDisplay = "READY    ";
+  OledDisplay = "IDLE   ";
   updateOLED();
 }
 
 int oled_last_refresh = millis();
 
 void loop() {
-
-  // OledDisplay = "READY    ";
 
   // process when end of command
   if (eoc)
@@ -245,6 +248,7 @@ void loop() {
     if (cmd.equalsIgnoreCase("C"))
     {
       // Serial.print("10#");
+      nLastPollByClient = millis();
     }
 
     // GP - get current position
@@ -402,7 +406,13 @@ void loop() {
     if (cmd.equalsIgnoreCase("FG"))
     {
       OledDisplay = "MOVING";
+      bSetIdle = false;
       updateOLED();
+
+      driver.rms_current(nCurrent);
+      driver.ihold(0);
+      driver.iholddelay(2);
+
 
       stepper.disableOutputs();
       float s = targetPosition< stepper.currentPosition()?nSpeed*-1:nSpeed;
@@ -426,7 +436,7 @@ void loop() {
     {
       // set RMS current
       // e.g. :SI0500$ - set to 500mA
-      int nCurrent = param.toInt();
+      nCurrent = param.toInt();
       driver.rms_current(nCurrent);
       // driver.irun(31);
       driver.ihold(0);
@@ -449,7 +459,14 @@ void loop() {
 
   if (stepper.distanceToGo()==0)
   {
-    OledDisplay = "READY    ";
+    if (millis()-nLastPollByClient>800)
+    {
+      OledDisplay = "IDLE    ";
+    }
+    else
+    {
+      OledDisplay = "CONNECTED";
+    }
     updateOLED();
   }
 
@@ -462,13 +479,21 @@ void loop() {
   //   oled_last_refresh = millis();
   // }
 
-  if (millis() - millisLastMove > millisDisableDelay)
+  if (millis() - millisLastMove > millisIdleDelay)
   {
     // Save current location in EEPROM
     if (lastSavedPosition != currentPosition)
     {
       EEPROM.put(0, currentPosition);
       lastSavedPosition = currentPosition;
+    }
+    
+    if (!bSetIdle)
+    {
+      driver.rms_current(IDLE_RMS_CURRENT);
+      driver.ihold(0);
+      driver.iholddelay(2);
+      bSetIdle = true;
     }
   }
 }
@@ -477,6 +502,7 @@ void updateOLED()
 {
     if (OledDisplay != OledDisplayed)
     {
+      oled.clear();
       oled.setRow(2);
       oled.setCol(36);
       oled.print(OledDisplay);
