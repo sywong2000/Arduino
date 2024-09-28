@@ -188,7 +188,7 @@ void setup() {
   targetPosition = currentPosition;
 
   Serial.begin(9600);
-  OledDisplay = "IDLE   ";
+  OledDisplay = "   IDLE   ";
   updateOLED();
 }
 
@@ -405,7 +405,6 @@ void loop() {
     // initiate a move
     if (cmd.equalsIgnoreCase("FG"))
     {
-      OledDisplay = "MOVING";
       bSetIdle = false;
       updateOLED();
 
@@ -455,17 +454,19 @@ void loop() {
     // stepper.runSpeed();
     stepper.run();
     millisLastMove = millis();
+    OledDisplay = "  MOVING  ";
+    updateOLED();
   }
 
   if (stepper.distanceToGo()==0)
   {
     if (millis()-nLastPollByClient>800)
     {
-      OledDisplay = "IDLE    ";
+      OledDisplay = "    IDLE    ";
     }
     else
     {
-      OledDisplay = "CONNECTED";
+      OledDisplay = "   READY   ";
     }
     updateOLED();
   }
