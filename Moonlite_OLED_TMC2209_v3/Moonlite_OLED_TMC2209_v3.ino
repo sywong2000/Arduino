@@ -1,4 +1,3 @@
-// #include <EEPROM.h>
 #include <TMCStepper.h>         // TMCstepper - https://github.com/teemuatlut/TMCStepper
 #include <AccelStepper.h>
 #include <Wire.h>
@@ -97,7 +96,7 @@ BLECharacteristic* pIsMovingCharacteristic = NULL;      // read, notification
 BLECharacteristic* pTargetPosCharacteristic = NULL;     // write only
 BLECharacteristic* pHaltRequestCharacteristic = NULL; // write only
 bool BLE_DeviceConnected = false;
-bool BLE_oldDeviceConnected = false;
+bool BLE_DeviceConnectedPrev = false;
 
 
 class FocuserServerCallbacks: public BLEServerCallbacks {
@@ -172,6 +171,7 @@ bool bSetToMove = false;
 bool bSetIdle = false;
 long millisLastMove = 0;
 long lastCharacteristicsUpdate = 0;
+long nextAdvertisementMillis = -1;
 
 const long millisIdleDelay = 5000; // 10 sec
 
@@ -280,7 +280,7 @@ void setup() {
 
   pHaltRequestCharacteristic->setCallbacks(new FocuserHaltRequestCharacteristicCallbacks());
 
-  pCurrentPosCharacteristics =  pService->createCharacteristic(
+  pCurrentPosCharacteristic =  pService->createCharacteristic(
     CURRENT_POS_CHARACTERISTIC_UUID,
     BLECharacteristic::PROPERTY_READ   |
     BLECharacteristic::PROPERTY_WRITE  |
@@ -288,7 +288,7 @@ void setup() {
     BLECharacteristic::PROPERTY_INDICATE
   );
 
-  pCurrentPosCharacteristics =  pService->createCharacteristic(
+  pIsMovingCharacteristic =  pService->createCharacteristic(
     IS_MOVING_CHARACTERISTIC_UUID,
     BLECharacteristic::PROPERTY_READ   |
     BLECharacteristic::PROPERTY_WRITE  |
@@ -298,8 +298,8 @@ void setup() {
 
   pTargetPosCharacteristic->addDescriptor(new BLE2902());
   pHaltRequestCharacteristic->addDescriptor(new BLE2902());
-  pCurrentPosCharacteristics->addDescriptor(new BLE2902());
-  pCurrentPosCharacteristics->addDescriptor(new BLE2902());
+  pCurrentPosCharacteristic->addDescriptor(new BLE2902());
+  pIsMovingCharacteristic->addDescriptor(new BLE2902());
 
   pService->start();
   BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
@@ -606,12 +606,30 @@ void loop() {
     pCurrentPosCharacteristic->setValue(currentPosition);
     pCurrentPosCharacteristic->notify();
     
-    pIsMovingCharacteristic->setValue(stepper.distanceToGo() != 0 && bSetToMove);
+    pIsMovingCharacteristic->setValue(String(stepper.distanceToGo() != 0 && bSetToMove));
     pIsMovingCharacteristic->notify();
 
     lastCharacteristicsUpdate = millis();
 
   }
+
+  // disconnecting
+  if (!BLE_DeviceConnected && BLE_DeviceConnectedPrev) {
+    nextAdvertisementMillis = millis() + 500; // start the advertisement again 500ms later, non blocking
+    BLE_DeviceConnectedPrev = BLE_DeviceConnected;
+  }
+  // connecting
+  if ( BLE_DeviceConnected && !BLE_DeviceConnectedPrev) {
+    BLE_DeviceConnectedPrev = BLE_DeviceConnected;
+  }
+
+
+  if (nextAdvertisementMillis>0 && millis()> nextAdvertisementMillis)
+  {
+    nextAdvertisementMillis = -1;
+    pServer->startAdvertising(); // restart advertising
+  }
+
 
 
   if (stepper.distanceToGo()!=0 && bSetToMove)
