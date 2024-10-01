@@ -28,22 +28,22 @@ long nPressed = 0;
 //AccelStepper stepper(1, stepPin, dirPin);
 int position = 0;
 int nStepSize = 40;
-int nSpeed = 4000;
+int nSpeed = 1000;
 int nStallCnt = 0;
 
-#define SW_SCK           5      // Software Slave Clock (SCK) - BLUE
-#define SW_TX            7      // SoftwareSerial receive pin - BROWN
-#define SW_RX            6      // SoftwareSerial transmit pin - YELLOW
+// #define SW_SCK           5      // Software Slave Clock (SCK) - BLUE
+// #define SW_TX            7      // SoftwareSerial receive pin - BROWN
+// #define SW_RX            6      // SoftwareSerial transmit pin - YELLOW
 #define DRIVER_ADDRESS   0b00   // TMC2209 Driver address according to MS1 and MS2
 #define R_SENSE 0.11f           // SilentStepStick series use 0.11 ...and so does my fysetc TMC2209 (?)
 #define STALL_VALUE     10 // [0..255]
 #define DIAG_PIN        A4
-#define TOFF_VALUE        4 // [1... 15]
+#define TOFF_VALUE       5   // [1... 15]
 
 
 //int DIAG_PIN  = A0;
 constexpr uint8_t sgthrs = STALL_VALUE;
-constexpr uint8_t semin = 3;
+constexpr uint8_t semin = 6;
 constexpr uint8_t semax = 2;
 
 // Create a new instance of the AccelStepper class:
@@ -124,8 +124,8 @@ void setup() {
   //                                // the limit set by TPWMTHRS, the driver switches to SpreadCycle.
 
   // Lower threshold velocity for switching on smart energy CoolStep and StallGuard to DIAG output
-  driver.TCOOLTHRS(0xFFFFF); // 20bit max
-  // driver.TCOOLTHRS(0x3FF);             // 0-7 TSTEP
+  //driver.TCOOLTHRS(0xFFFFF); // 20bit max
+  driver.TCOOLTHRS(0x3FF);             // 0-7 TSTEP
   //                                // 0: TPWM_THRS= 0
   //                                // 1: TPWM_THRS= 200
   //                                // 2: TPWM_THRS= 300
@@ -241,6 +241,10 @@ void loop()
     else if (cmd == "irun") {
 			driver.irun((int)d);
 		}
+    else if (cmd == "speed")
+    {
+      driver.VACTUAL((int)d);
+    }
     readString= "";
   }
 
