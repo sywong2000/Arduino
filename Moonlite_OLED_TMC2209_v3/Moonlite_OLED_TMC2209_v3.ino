@@ -26,7 +26,7 @@
 // USB CDC On Boot: Enabled
 // JTAG Adapter: Integrated USB JTAG
 
-// TMC2209 pinout (c:\Users\sywong.manager\AppData\Local\Arduino15\packages\arduino\hardware\avr\1.8.6\cores\arduino\CDC.cppleft side  - target pin)
+// TMC2209 pinout 
 // EN     - GPIO_3_A3
 // MS1    - N/A
 // MS2    - N/A
@@ -62,12 +62,14 @@
 #define ENABLE_PIN        A3    
 #define STEP_PIN          A1
 #define DIR_PIN           A0
+#define DIAG_PIN          A4
+
 #define HALF_STEP         64
 #define FULL_STEP         32
 
 #define DRIVER_ADDRESS    0b00    // TMC2209 Driver address according to MS1 and MS2
 #define R_SENSE           0.11f   // SilentStepStick series use 0.11 ...and so does my fysetc TMC2209 (?)
-#define RMS_CURRENT       1800    // (RMS*sqrt(2) ~ max current consumption)
+#define RMS_CURRENT       2100    // (RMS*sqrt(2) ~ max current consumption)
 #define IDLE_RMS_CURRENT  200     // Idle Current
 #define STALL_VALUE       100     // 0 - 255, higher value more sensitive
 
@@ -80,11 +82,19 @@
 SSD1306AsciiWire oled;
 
 // BLE services and characteristics UUID
-#define SERVICE_UUID                        "19b10000-e8f2-537e-4f6c-d104768a1214"
-#define CURRENT_POS_CHARACTERISTIC_UUID     "19b10001-e8f2-537e-4f6c-d104768a1214"
-#define TARGET_POS_CHARACTERISTIC_UUID      "19b10002-e8f2-537e-4f6c-d104768a1214"
-#define IS_MOVING_CHARACTERISTIC_UUID       "19b10003-e8f2-537e-4f6c-d104768a1214"
-#define HALT_REQUEST_CHARACTERISTIC_UUID    "19b10004-e8f2-537e-4f6c-d104768a1214"
+#define SERVICE_UUID                            "19b10000-e8f2-537e-4f6c-d104768a1214"
+#define CURRENT_POS_CHARACTERISTIC_UUID         "19b10001-e8f2-537e-4f6c-d104768a1214"
+#define TARGET_POS_CHARACTERISTIC_UUID          "19b10002-e8f2-537e-4f6c-d104768a1214"
+#define IS_MOVING_CHARACTERISTIC_UUID           "19b10003-e8f2-537e-4f6c-d104768a1214"
+#define HALT_REQUEST_CHARACTERISTIC_UUID        "19b10004-e8f2-537e-4f6c-d104768a1214"
+
+#define SG_RESULT_CHARACTERISTIC_UUID           "19b10005-e8f2-537e-4f6c-d104768a1214"
+#define ACTUAL_CURRENT_CHARACTERISTIC_UUID      "19b10006-e8f2-537e-4f6c-d104768a1214"
+#define DIAG_VALUE_CHARACTERISTIC_UUID          "19b10007-e8f2-537e-4f6c-d104768a1214"
+#define SEMIN_CHARACTERISTIC_UUID               "19b10008-e8f2-537e-4f6c-d104768a1214"
+#define SEMAX_CHARACTERISTIC_UUID               "19b10009-e8f2-537e-4f6c-d104768a1214"
+#define SGTHRS_CHARACTERISTIC_UUID              "19b10010-e8f2-537e-4f6c-d104768a1214"
+
 
 bool bMoveRequestFromBLE = false;
 bool bHaltRequestFromBLE = false;
@@ -93,8 +103,19 @@ int nRequestedTargetPositionFromBLE = -1;
 BLEServer* pServer = NULL;
 BLECharacteristic* pCurrentPosCharacteristic = NULL;    // read, notification
 BLECharacteristic* pIsMovingCharacteristic = NULL;      // read, notification
+BLECharacteristic* pSGResultCharacteristic = NULL;    // read, notification
+BLECharacteristic* pActualCurrentCharacteristic = NULL;      // read, notification
+BLECharacteristic* pDiagValueCharacteristic = NULL;      // read, notification
+BLECharacteristic* pSeMinCharacteristic = NULL;    // read, notification
+BLECharacteristic* pSeMaxCharacteristic = NULL;      // read, notification
+BLECharacteristic* pSgThrsCharacteristic = NULL;    // read, notification
+
+
+
 BLECharacteristic* pTargetPosCharacteristic = NULL;     // write only
 BLECharacteristic* pHaltRequestCharacteristic = NULL; // write only
+
+
 bool BLE_DeviceConnected = false;
 bool BLE_DeviceConnectedPrev = false;
 
@@ -174,6 +195,7 @@ long lastCharacteristicsUpdate = 0;
 long nextAdvertisementMillis = -1;
 
 const long millisIdleDelay = 5000; // 10 sec
+const long nBLECharacteristicsRefreshMs = 50;
 
 
 int nCurrent = RMS_CURRENT;
@@ -283,18 +305,54 @@ void setup() {
   pCurrentPosCharacteristic =  pService->createCharacteristic(
     CURRENT_POS_CHARACTERISTIC_UUID,
     BLECharacteristic::PROPERTY_READ   |
-    BLECharacteristic::PROPERTY_WRITE  |
-    BLECharacteristic::PROPERTY_NOTIFY |
-    BLECharacteristic::PROPERTY_INDICATE
+    BLECharacteristic::PROPERTY_NOTIFY
   );
 
   pIsMovingCharacteristic =  pService->createCharacteristic(
     IS_MOVING_CHARACTERISTIC_UUID,
     BLECharacteristic::PROPERTY_READ   |
-    BLECharacteristic::PROPERTY_WRITE  |
-    BLECharacteristic::PROPERTY_NOTIFY |
-    BLECharacteristic::PROPERTY_INDICATE
+    BLECharacteristic::PROPERTY_NOTIFY 
   );
+
+  pSGResultCharacteristic =  pService->createCharacteristic(
+    SG_RESULT_CHARACTERISTIC_UUID,
+    BLECharacteristic::PROPERTY_READ   |
+    BLECharacteristic::PROPERTY_NOTIFY 
+  );
+
+  pActualCurrentCharacteristic =  pService->createCharacteristic(
+    ACTUAL_CURRENT_CHARACTERISTIC_UUID,
+    BLECharacteristic::PROPERTY_READ   |
+    BLECharacteristic::PROPERTY_NOTIFY 
+  );
+
+  pDiagValueCharacteristic =  pService->createCharacteristic(
+    DIAG_VALUE_CHARACTERISTIC_UUID,
+    BLECharacteristic::PROPERTY_READ   |
+    BLECharacteristic::PROPERTY_NOTIFY 
+  );
+
+  pSeMinCharacteristic =  pService->createCharacteristic(
+    SEMIN_CHARACTERISTIC_UUID,
+    BLECharacteristic::PROPERTY_READ   |
+    BLECharacteristic::PROPERTY_WRITE  |
+    BLECharacteristic::PROPERTY_NOTIFY 
+  );
+
+  pSeMaxCharacteristic =  pService->createCharacteristic(
+    SEMAX_CHARACTERISTIC_UUID,
+    BLECharacteristic::PROPERTY_READ   |
+    BLECharacteristic::PROPERTY_WRITE  |
+    BLECharacteristic::PROPERTY_NOTIFY 
+  );
+
+  pSgThrsCharacteristic =  pService->createCharacteristic(
+    SGTHRS_CHARACTERISTIC_UUID,
+    BLECharacteristic::PROPERTY_READ   |
+    BLECharacteristic::PROPERTY_WRITE  |
+    BLECharacteristic::PROPERTY_NOTIFY 
+  );
+
 
   pTargetPosCharacteristic->addDescriptor(new BLE2902());
   pHaltRequestCharacteristic->addDescriptor(new BLE2902());
@@ -612,7 +670,7 @@ void loop() {
       bHaltRequestFromBLE = false;
   }
 
-  if (BLE_DeviceConnected && (millis() - lastCharacteristicsUpdate > 100))
+  if (BLE_DeviceConnected && (millis() - lastCharacteristicsUpdate > nBLECharacteristicsRefreshMs))
   {
     // update the characteristics
     pCurrentPosCharacteristic->setValue(currentPosition);
@@ -621,8 +679,25 @@ void loop() {
     pIsMovingCharacteristic->setValue(String(stepper.distanceToGo() != 0 && bSetToMove));
     pIsMovingCharacteristic->notify();
 
-    lastCharacteristicsUpdate = millis();
+    pSGResultCharacteristic->setValue(String(driver.SG_RESULT()));
+    pSGResultCharacteristic->notify();
 
+    pActualCurrentCharacteristic->setValue(String(driver.cs2rms(driver.cs_actual())));
+    pActualCurrentCharacteristic->notify();
+
+    pDiagValueCharacteristic->setValue(String(100 * digitalRead(DIAG_PIN)));
+    pDiagValueCharacteristic->notify();
+
+    pSeMinCharacteristic->setValue(String(driver.semin()*32));
+    pSeMinCharacteristic->notify();
+
+    pSeMaxCharacteristic->setValue(String((driver.semin()+driver.semax()+1)*32));
+    pSeMaxCharacteristic->notify();
+
+    pSgThrsCharacteristic->setValue(String(driver.SGTHRS()*2));
+    pSgThrsCharacteristic->notify();
+
+    lastCharacteristicsUpdate = millis();
   }
 
   // disconnecting
