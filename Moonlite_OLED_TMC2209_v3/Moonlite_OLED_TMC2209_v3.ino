@@ -62,12 +62,12 @@
 #define ENABLE_PIN        A3    
 #define STEP_PIN          A1
 #define DIR_PIN           A0
-#define HALF_STEP         32
-#define FULL_STEP         16
+#define HALF_STEP         64
+#define FULL_STEP         32
 
 #define DRIVER_ADDRESS    0b00    // TMC2209 Driver address according to MS1 and MS2
 #define R_SENSE           0.11f   // SilentStepStick series use 0.11 ...and so does my fysetc TMC2209 (?)
-#define RMS_CURRENT       1700    // (RMS*sqrt(2) ~ max current consumption)
+#define RMS_CURRENT       1800    // (RMS*sqrt(2) ~ max current consumption)
 #define IDLE_RMS_CURRENT  200     // Idle Current
 #define STALL_VALUE       100     // 0 - 255, higher value more sensitive
 
@@ -162,8 +162,8 @@ bool eoc = false;
 bool bHalfStep = false;
 int LineLen= 0;
 String cmd, param, line;
-const long nSpeedConstant = 100;
-long nSpeedFactor = 10;
+long nSpeedConstant = 100;
+long nSpeedFactor = 16; // default is 250pps (32/02)
 long nSpeed = nSpeedConstant* nSpeedFactor;
 
 float tCoeff = 0;
@@ -558,15 +558,27 @@ void loop() {
 
     // non-standard commands
 
+    // set RMS current
+    // e.g. :SI0500$ - set to 500mA
     if (cmd.equalsIgnoreCase("SI"))
     {
-      // set RMS current
-      // e.g. :SI0500$ - set to 500mA
       nCurrent = param.toInt();
       driver.rms_current(nCurrent);
       // driver.irun(31);
       driver.ihold(0);
       driver.iholddelay(2);
+    }
+
+    // set Speed Rate Constant
+    // e.g. :RC10$ - set to nSpeedConstant to 10
+    if (cmd.equalsIgnoreCase("RC"))
+    {
+      nSpeedConstant = param.toInt();
+      nSpeed = nSpeedConstant * nSpeedFactor;
+      float s = targetPosition< stepper.currentPosition()?nSpeed*-1:nSpeed;
+      stepper.setMaxSpeed(s);
+      stepper.setSpeed(s);
+      stepper.setAcceleration(50000);
     }
 
 
