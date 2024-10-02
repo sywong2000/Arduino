@@ -2,7 +2,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>ESP32 Web BLE App</title>
+    <title>MOONLITE Web BLE App</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/png" href="favicon.ico">
     <link rel="stylesheet" type="text/css" href="style.css">
@@ -10,29 +10,29 @@
 </head>
 <body>
     <div class="topnav">
-        <h1>ESP32 Web BLE Application</h1>
+        <h1>MOONLITE Web BLE Application</h1>
     </div>
     <div class="content">
         <div class="card-grid">
             <div class="card">
                 <p>
-                    <button id="connectBleButton" class="connectButton"> Connect to BLE Device</button>
-                    <button id="disconnectBleButton" class="disconnectButton"> Disconnect BLE Device</button>
+                    <button id="connectBleButton" class="connectButton"> Connect to Moonlite BLE Device</button>
+                    <button id="disconnectBleButton" class="disconnectButton"> Disconnect </button>
                 </p>
                 <p class="gray-label">BLE state: <strong><span id="bleState" style="color:#d13a30;">Disconnected</span></strong></p>
             </div>
         </div>
         <div class="card-grid">   
             <div class="card">
-                <h2>Fetched Value</h2>
+                <h2>Current Position</h2>
                 <p class="reading"><span id="valueContainer">NaN</span></p>
                 <p class="gray-label">Last reading: <span id="timestamp"></span></p>
             </div>
 
             <div class="card">
-                <h2>Control GPIO 2</h2>
-                <button id="onButton" class="onButton">ON</button>
-                <button id="offButton" class="offButton">OFF</button>
+                <h2>Step Buttons</h2>
+                <button id="forward1000Button" class="forwardButton">+1000</button>
+                <button id="backward1000Button" class="backwardButton">-1000</button>
                 <p class="gray-label">Last value sent: <span id="valueSent"></span></p>
             </div>
         </div>
@@ -46,6 +46,10 @@
     const disconnectButton = document.getElementById('disconnectBleButton');
     const onButton = document.getElementById('onButton');
     const offButton = document.getElementById('offButton');
+
+    const forward1000Button = document.getElementById('forward1000Button');
+    const backward1000Button = document.getElementById('backward1000Button');
+
     const retrievedValue = document.getElementById('valueContainer');
     const latestValueSent = document.getElementById('valueSent');
     const bleStateContainer = document.getElementById('bleState');
@@ -53,9 +57,18 @@
 
     //Define BLE Device Specs
     var deviceName ='MOONLITE BLE';
-    var bleService = '19b10000-e8f2-537e-4f6c-d104768a1214';
-    var ledCharacteristic = '19b10002-e8f2-537e-4f6c-d104768a1214';
-    var sensorCharacteristic= '19b10001-e8f2-537e-4f6c-d104768a1214';
+    var bleService                              = '19b10000-e8f2-537e-4f6c-d104768a1214';
+    var currentPosCharacteristic                = '19b10001-e8f2-537e-4f6c-d104768a1214';
+    var targetPosCharacteristic                 = '19b10002-e8f2-537e-4f6c-d104768a1214';
+    var isMovingCharacteristic                  = '19b10003-e8f2-537e-4f6c-d104768a1214';
+    var haltRequestCharacteristic               = '19b10004-e8f2-537e-4f6c-d104768a1214';
+    var SGResultCharacteristic                  = '19b10005-e8f2-537e-4f6c-d104768a1214';
+    var actualCurrentCharacteristic             = '19b10006-e8f2-537e-4f6c-d104768a1214';
+    var diagValueCharacteristic                 = '19b10007-e8f2-537e-4f6c-d104768a1214';
+    var seMinValueCharacteristic                = '19b10008-e8f2-537e-4f6c-d104768a1214';
+    var seMaxValueCharacteristic                = '19b10009-e8f2-537e-4f6c-d104768a1214';
+    var sgThrsCharacteristic                    = '19b10010-e8f2-537e-4f6c-d104768a1214';
+
 
     //Global Variables to Handle Bluetooth
     var bleServer;
@@ -75,6 +88,8 @@
     // Write to the ESP32 LED Characteristic
     onButton.addEventListener('click', () => writeOnCharacteristic(1));
     offButton.addEventListener('click', () => writeOnCharacteristic(0));
+
+    forward1000Button.addEventListener('click', () => writeOnCharacteristic(1));
 
     // Check if BLE is available in your Browser
     function isWebBluetoothEnabled() {
@@ -109,21 +124,14 @@
         .then(service => {
             bleServiceFound = service;
             console.log("Service discovered:", service.uuid);
-            return service.getCharacteristic(sensorCharacteristic);
+            return service.getCharacteristics();
         })
-        .then(characteristic => {
-            console.log("Characteristic discovered:", characteristic.uuid);
-            sensorCharacteristicFound = characteristic;
-            characteristic.addEventListener('characteristicvaluechanged', handleCharacteristicChange);
-            characteristic.startNotifications();
-            console.log("Notifications Started.");
-            return characteristic.readValue();
-        })
-        .then(value => {
-            console.log("Read value: ", value);
-            const decodedValue = new TextDecoder().decode(value);
-            console.log("Decoded value: ", decodedValue);
-            retrievedValue.innerHTML = decodedValue;            
+        .then(characteristics => {
+            characteristics.forEach(characteristic => {
+                if (characteristic.uuid==currentPosCharacteristicUuid){
+                    characteristic.addEventListener('characteristicvaluechanged', handleCurrentPosCharacteristicChange);
+            }
+            })
         })
         .catch(error => {
             console.log('Error: ', error);
@@ -138,12 +146,15 @@
         connectToDevice();
     }
 
-    function handleCharacteristicChange(event){
+    function handleCurrentPosCharacteristicChange(event){
         const newValueReceived = new TextDecoder().decode(event.target.value);
         console.log("Characteristic value changed: ", newValueReceived);
         retrievedValue.innerHTML = newValueReceived;
         timestampContainer.innerHTML = getDateTime();
     }
+
+    
+
 
     function writeOnCharacteristic(value){
         if (bleServer && bleServer.connected) {
@@ -157,6 +168,27 @@
                 latestValueSent.innerHTML = value;
                 console.log("Value written to LEDcharacteristic:", value);
             })
+            .catch(error => {
+                console.error("Error writing to the LED characteristic: ", error);
+            });
+        } else {
+            console.error ("Bluetooth is not connected. Cannot write to characteristic.")
+            window.alert("Bluetooth is not connected. Cannot write to characteristic. \n Connect to BLE first!")
+        }
+    }
+
+    function writeOnTargetPosCharacteristic(value){
+        if (bleServer && bleServer.connected) {
+            bleServiceFound.getCharacteristic(targetPosCharacteristic)
+            .then(characteristic => {
+                console.log("Found the Target Pos characteristic: ", characteristic.uuid);
+                const data = value.tostring();
+                return characteristic.writeValue(data);
+            })
+            // .then(() => {
+            //     latestValueSent.innerHTML = value;
+            //     console.log("Value written to LEDcharacteristic:", value);
+            // })
             .catch(error => {
                 console.error("Error writing to the LED characteristic: ", error);
             });
