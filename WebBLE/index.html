@@ -58,22 +58,24 @@
     //Define BLE Device Specs
     var deviceName ='MOONLITE BLE';
     var bleService                              = '19b10000-e8f2-537e-4f6c-d104768a1214';
-    var currentPosCharacteristic                = '19b10001-e8f2-537e-4f6c-d104768a1214';
-    var targetPosCharacteristic                 = '19b10002-e8f2-537e-4f6c-d104768a1214';
-    var isMovingCharacteristic                  = '19b10003-e8f2-537e-4f6c-d104768a1214';
-    var haltRequestCharacteristic               = '19b10004-e8f2-537e-4f6c-d104768a1214';
-    var SGResultCharacteristic                  = '19b10005-e8f2-537e-4f6c-d104768a1214';
-    var actualCurrentCharacteristic             = '19b10006-e8f2-537e-4f6c-d104768a1214';
-    var diagValueCharacteristic                 = '19b10007-e8f2-537e-4f6c-d104768a1214';
-    var seMinValueCharacteristic                = '19b10008-e8f2-537e-4f6c-d104768a1214';
-    var seMaxValueCharacteristic                = '19b10009-e8f2-537e-4f6c-d104768a1214';
-    var sgThrsCharacteristic                    = '19b10010-e8f2-537e-4f6c-d104768a1214';
+    var currentPosCharacteristicUuid            = '19b10001-e8f2-537e-4f6c-d104768a1214';
+    var targetPosCharacteristicUuid             = '19b10002-e8f2-537e-4f6c-d104768a1214';
+    var isMovingCharacteristicUuid              = '19b10003-e8f2-537e-4f6c-d104768a1214';
+    var haltRequestCharacteristicUuid           = '19b10004-e8f2-537e-4f6c-d104768a1214';
+    var SGResultCharacteristicUuid              = '19b10005-e8f2-537e-4f6c-d104768a1214';
+    var actualCurrentCharacteristicUuid         = '19b10006-e8f2-537e-4f6c-d104768a1214';
+    var diagValueCharacteristicUuid             = '19b10007-e8f2-537e-4f6c-d104768a1214';
+    var seMinValueCharacteristicUuid            = '19b10008-e8f2-537e-4f6c-d104768a1214';
+    var seMaxValueCharacteristicUuid            = '19b10009-e8f2-537e-4f6c-d104768a1214';
+    var sgThrsCharacteristicUuid                = '19b10010-e8f2-537e-4f6c-d104768a1214';
 
 
     //Global Variables to Handle Bluetooth
     var bleServer;
     var bleServiceFound;
     var sensorCharacteristicFound;
+
+    var currentPosition = 0;
 
     // Connect Button (search for BLE Devices only if BLE is available)
     connectButton.addEventListener('click', (event) => {
@@ -86,10 +88,10 @@
     disconnectButton.addEventListener('click', disconnectDevice);
 
     // Write to the ESP32 LED Characteristic
-    onButton.addEventListener('click', () => writeOnCharacteristic(1));
-    offButton.addEventListener('click', () => writeOnCharacteristic(0));
-
-    forward1000Button.addEventListener('click', () => writeOnCharacteristic(1));
+    // onButton.addEventListener('click', () => writeOnCharacteristic(1));
+    // offButton.addEventListener('click', () => writeOnCharacteristic(0));
+    forward1000Button.addEventListener('click', () => writeOnTargetPosCharacteristic(currentPosition+1000));
+    backward1000Button.addEventListener('click', () => writeOnTargetPosCharacteristic(currentPosition-1000));
 
     // Check if BLE is available in your Browser
     function isWebBluetoothEnabled() {
@@ -106,8 +108,8 @@
     function connectToDevice(){
         console.log('Initializing Bluetooth...');
         navigator.bluetooth.requestDevice({
-            filters: [{name: deviceName}],
-            optionalServices: [bleService]
+            filters: [{name: deviceName}]
+            ,optionalServices: [bleService]
         })
         .then(device => {
             console.log('Device Selected:', device.name);
@@ -118,18 +120,27 @@
         })
         .then(gattServer =>{
             bleServer = gattServer;
-            console.log("Connected to GATT Server");
-            return bleServer.getPrimaryService(bleService);
+            console.log("Connected to GATT Server.. getting primary service");
+            var pri_service = bleServer.getPrimaryService(bleService);
+            return pri_service;
         })
         .then(service => {
-            bleServiceFound = service;
             console.log("Service discovered:", service.uuid);
+            bleServiceFound = service;
             return service.getCharacteristics();
         })
         .then(characteristics => {
             characteristics.forEach(characteristic => {
                 if (characteristic.uuid==currentPosCharacteristicUuid){
+                    console.log('Current Position Characteristics Found');
+                    const newValueReceived = characteristic.readValue();
+                    currentPosition = parseInt(newValueReceived);
+                    retrievedValue.innerHTML = newValueReceived;
+                    timestampContainer.innerHTML = getDateTime();
+
                     characteristic.addEventListener('characteristicvaluechanged', handleCurrentPosCharacteristicChange);
+                    characteristic.startNotifications();
+                    console.log('Registered Current Position Changed Event and started.');
             }
             })
         })
@@ -142,19 +153,16 @@
         console.log('Device Disconnected:', event.target.device.name);
         bleStateContainer.innerHTML = "Device disconnected";
         bleStateContainer.style.color = "#d13a30";
-
         connectToDevice();
     }
 
     function handleCurrentPosCharacteristicChange(event){
         const newValueReceived = new TextDecoder().decode(event.target.value);
-        console.log("Characteristic value changed: ", newValueReceived);
+        currentPosition = parseInt(newValueReceived);
+        console.log("Position Updated: ", newValueReceived);
         retrievedValue.innerHTML = newValueReceived;
         timestampContainer.innerHTML = getDateTime();
     }
-
-    
-
 
     function writeOnCharacteristic(value){
         if (bleServer && bleServer.connected) {
@@ -179,15 +187,15 @@
 
     function writeOnTargetPosCharacteristic(value){
         if (bleServer && bleServer.connected) {
-            bleServiceFound.getCharacteristic(targetPosCharacteristic)
+            bleServiceFound.getCharacteristic(targetPosCharacteristicUuid)
             .then(characteristic => {
-                console.log("Found the Target Pos characteristic: ", characteristic.uuid);
-                const data = value.tostring();
-                return characteristic.writeValue(data);
+                const data = value.toString();
+                console.log("Writing TargetPos:"+ data);
+                characteristic.writeValueWithoutResponse(new TextEncoder().encode(data));
+                return characteristic;
             })
-            // .then(() => {
-            //     latestValueSent.innerHTML = value;
-            //     console.log("Value written to LEDcharacteristic:", value);
+            // .then(characteristic => {
+            //     latestValueSent.innerHTML = characteristic.readValue();
             // })
             .catch(error => {
                 console.error("Error writing to the LED characteristic: ", error);

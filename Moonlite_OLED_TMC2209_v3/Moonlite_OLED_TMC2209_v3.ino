@@ -135,17 +135,13 @@ class FocuserTargetPosCharacteristicCallbacks : public BLECharacteristicCallback
   void onWrite(BLECharacteristic* pTargetPosCharacteristic) {
 
     String value = pTargetPosCharacteristic->getValue();
+    
     if (value.length() > 0) {
-      // Serial.print("Characteristic event, written: ");
-      // Serial.println(static_cast<int>(value[0])); // Print the integer value
-
-      nRequestedTargetPositionFromBLE = static_cast<int>(value[0]);
+      nRequestedTargetPositionFromBLE = value.toInt();
       if (nRequestedTargetPositionFromBLE >=0) {
         bMoveRequestFromBLE = true; // this will be processed in the loop logic
       }
     }
-    // pLedCharacteristic->setValue("Hello World!");
-    // pLedCharacteristic->notify();
   }
 };
 
@@ -290,6 +286,7 @@ void setup() {
 
   pTargetPosCharacteristic = pService->createCharacteristic(
     TARGET_POS_CHARACTERISTIC_UUID,
+    BLECharacteristic::PROPERTY_READ   |
     BLECharacteristic::PROPERTY_WRITE
   );
   
@@ -297,6 +294,7 @@ void setup() {
 
   pHaltRequestCharacteristic = pService->createCharacteristic(
     HALT_REQUEST_CHARACTERISTIC_UUID,
+    BLECharacteristic::PROPERTY_READ   |
     BLECharacteristic::PROPERTY_WRITE
     );
 
@@ -650,6 +648,7 @@ void loop() {
   if (bMoveRequestFromBLE)
   {
     targetPosition = nRequestedTargetPositionFromBLE;
+    stepper.moveTo(targetPosition);
     driver.rms_current(nCurrent);
     driver.ihold(0);
     driver.iholddelay(2);
@@ -673,29 +672,52 @@ void loop() {
   if (BLE_DeviceConnected && (millis() - lastCharacteristicsUpdate > nBLECharacteristicsRefreshMs))
   {
     // update the characteristics
-    pCurrentPosCharacteristic->setValue(currentPosition);
-    pCurrentPosCharacteristic->notify();
-    
-    pIsMovingCharacteristic->setValue(String(stepper.distanceToGo() != 0 && bSetToMove));
-    pIsMovingCharacteristic->notify();
+    if (String(stepper.currentPosition())!= pCurrentPosCharacteristic->getValue())
+    {
+      pCurrentPosCharacteristic->setValue(String(stepper.currentPosition()));
+      pCurrentPosCharacteristic->notify();
+    }
+    if (String(stepper.distanceToGo() != 0 && bSetToMove)!=pIsMovingCharacteristic->getValue())
+    {
+      pIsMovingCharacteristic->setValue(String(stepper.distanceToGo() != 0 && bSetToMove));
+      pIsMovingCharacteristic->notify();
+    }
 
-    pSGResultCharacteristic->setValue(String(driver.SG_RESULT()));
-    pSGResultCharacteristic->notify();
+    if (String(driver.SG_RESULT())!=pSGResultCharacteristic->getValue())
+    {
+      pSGResultCharacteristic->setValue(String(driver.SG_RESULT()));
+      pSGResultCharacteristic->notify();
+    }
 
-    pActualCurrentCharacteristic->setValue(String(driver.cs2rms(driver.cs_actual())));
-    pActualCurrentCharacteristic->notify();
+    if (String(driver.cs2rms(driver.cs_actual()))!=pActualCurrentCharacteristic->getValue())
+    {
+      pActualCurrentCharacteristic->setValue(String(driver.cs2rms(driver.cs_actual())));
+      pActualCurrentCharacteristic->notify();
+    }
 
-    pDiagValueCharacteristic->setValue(String(100 * digitalRead(DIAG_PIN)));
-    pDiagValueCharacteristic->notify();
+    if (String(digitalRead(DIAG_PIN))!=pDiagValueCharacteristic->getValue())
+    {
+      pDiagValueCharacteristic->setValue(String(digitalRead(DIAG_PIN)));
+      pDiagValueCharacteristic->notify();
+    }
 
-    pSeMinCharacteristic->setValue(String(driver.semin()*32));
-    pSeMinCharacteristic->notify();
+    if (String(driver.semin()*32)!=pSeMinCharacteristic->getValue())
+    {
+      pSeMinCharacteristic->setValue(String(driver.semin()*32));
+      pSeMinCharacteristic->notify();
+    }
 
-    pSeMaxCharacteristic->setValue(String((driver.semin()+driver.semax()+1)*32));
-    pSeMaxCharacteristic->notify();
+    if (String((driver.semin()+driver.semax()+1)*32)!=pSeMaxCharacteristic->getValue())
+    {
+      pSeMaxCharacteristic->setValue(String((driver.semin()+driver.semax()+1)*32));
+      pSeMaxCharacteristic->notify();
+    }
 
-    pSgThrsCharacteristic->setValue(String(driver.SGTHRS()*2));
-    pSgThrsCharacteristic->notify();
+    if (String(driver.SGTHRS()*2)!=pSgThrsCharacteristic->getValue())
+    {
+      pSgThrsCharacteristic->setValue(String(driver.SGTHRS()*2));
+      pSgThrsCharacteristic->notify();
+    }
 
     lastCharacteristicsUpdate = millis();
   }
