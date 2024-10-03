@@ -186,6 +186,9 @@
             }
             });
         })
+        .then(()=>{
+            window.alert("CONNECTED");
+        })
         .catch(error => {
             console.log('Error: ', error);
             window.alert(error);
