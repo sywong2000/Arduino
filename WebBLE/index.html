@@ -272,7 +272,7 @@
             .then(characteristic => {
                 console.log("Stopping... ");
                 // write any values
-                characteristic.writeValueWithoutResponse(textEncoder.encode("0"));
+                characteristic.writeValueWithResponse(textEncoder.encode("0"));
                 return characteristic;
             })
             .catch(error => {
