@@ -228,10 +228,12 @@
         if (bleServer && bleServer.connected) {
             bleServiceFound.getCharacteristic(targetPosCharacteristicUuid)
             .then(characteristic => {
+                var encoder = new TextEncoder();
                 const data = value.toString();
                 console.log("Writing TargetPos:"+ data);
-                characteristic.writeValueWithoutResponse(new TextEncoder().encode(data));
-                return characteristic;
+                window.alert("Writing TargetPos:"+ data + "encoded="+ encoder.encode(data));
+                characteristic.writeValueWithoutResponse(encoder.encode(data));
+                // return characteristic;
             })
             // .then(characteristic => {
             //     latestValueSent.innerHTML = characteristic.readValue();
