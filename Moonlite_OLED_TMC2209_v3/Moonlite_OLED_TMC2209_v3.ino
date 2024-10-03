@@ -138,7 +138,7 @@ bool eoc = false;
 bool bHalfStep = false;
 int LineLen= 0;
 String cmd, param, line;
-long nSpeedConstant = 100;
+long nSpeedConstant = 50;
 long nSpeedFactor = 16; // default is 250pps (32/02)
 long nSpeed = nSpeedConstant* nSpeedFactor;
 
@@ -179,9 +179,7 @@ class FocuserServerCallbacks: public BLEServerCallbacks {
 
 class FocuserTargetPosCharacteristicCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* pTargetPosCharacteristic) {
-
     String value = pTargetPosCharacteristic->getValue();
-    
     if (value.length() > 0) {
       int nRequestedTargetPositionFromBLE = value.toInt();
       if (nRequestedTargetPositionFromBLE >=0) {
@@ -193,6 +191,7 @@ class FocuserTargetPosCharacteristicCallbacks : public BLECharacteristicCallback
         bSetIdle = false;
         stepper.disableOutputs();
         updateStepperSpeed(nSpeed);
+        bSetToMove = true;
       }
     }
   }
@@ -403,6 +402,7 @@ void setup() {
 }
 
 int oled_last_refresh = millis();
+
 
 void loop() {
 
