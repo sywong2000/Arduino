@@ -169,7 +169,6 @@
             return service.getCharacteristics();
         })
         .then(characteristics => {
-            var bFound = false;
             characteristics.forEach(characteristic => {
                 if (characteristic.uuid==currentPosCharacteristicUuid){
                     curPositionCharacteristicFound = characteristic;
@@ -182,17 +181,11 @@
                     characteristic.addEventListener('characteristicvaluechanged', handleCurrentPosCharacteristicChange);
                     characteristic.startNotifications();
                     console.log('Registered Current Position Changed Event and started.');
-                    bFound = true;
+                    bleStateContainer.innerHTML = 'Connected';
+                    bleStateContainer.style.color = "#24af37";
 
             }
             });
-
-            if (bFound)
-            {
-                bleStateContainer.innerHTML = 'Connected to ' + bleServer.device.name;
-                bleStateContainer.style.color = "#24af37";
-            }
-
         })
         .catch(error => {
             console.log('Error: ', error);
