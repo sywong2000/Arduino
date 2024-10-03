@@ -75,6 +75,7 @@
     const backward100Button = document.getElementById('backward100Button');
     const backward500Button = document.getElementById('backward500Button');
     const backward1000Button = document.getElementById('backward1000Button');
+    const stopButton = document.getElementById('stopButton');
 
     const currentPosValue = document.getElementById('curPositionContainer');
     //const latestValueSent = document.getElementById('valueSent');
@@ -126,10 +127,12 @@
     backward100Button.addEventListener('click', () => writeOnTargetPosCharacteristic(currentPosition-100));
     backward500Button.addEventListener('click', () => writeOnTargetPosCharacteristic(currentPosition-500));
     backward1000Button.addEventListener('click', () => writeOnTargetPosCharacteristic(currentPosition-1000));
+    stopButton.addEventListener('click', () => writeOnHaltCharacteristic());
     speedSelection.addEventListener('change', (e) => 
     {
         writeOnSpeedCharacteristic(e.target.value);
     });
+    
 
     // Check if BLE is available in your Browser
     function isWebBluetoothEnabled() {
@@ -255,6 +258,24 @@
             })
             .catch(error => {
                 console.error("Error writing to the Speed characteristic: ", error);
+            });
+        } else {
+            console.error ("Bluetooth is not connected. Cannot write to characteristic.")
+            window.alert("Bluetooth is not connected. Cannot write to characteristic. \n Connect to BLE first!")
+        }
+    }    
+
+    function writeOnHaltCharacteristic(){
+        if (bleServer && bleServer.connected) {
+            bleServiceFound.getCharacteristic(haltRequestCharacteristicUuid)
+            .then(characteristic => {
+                console.log("Stopping... ");
+                // write any values
+                characteristic.writeValueWithoutResponse(new TextEncoder().encode("0"));
+                return characteristic;
+            })
+            .catch(error => {
+                console.error("Error writing to the Halt characteristic: ", error);
             });
         } else {
             console.error ("Bluetooth is not connected. Cannot write to characteristic.")

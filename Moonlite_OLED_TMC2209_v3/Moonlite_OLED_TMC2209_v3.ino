@@ -97,7 +97,6 @@ SSD1306AsciiWire oled;
 
 #define SPEED_CHARACTERISTIC_UUID               "19b10011-e8f2-537e-4f6c-d104768a1214"
 
-bool bHaltRequestFromBLE = false;
 
 BLEServer* pServer = NULL;
 BLECharacteristic* pCurrentPosCharacteristic = NULL;    // read, notification
@@ -170,16 +169,10 @@ class FocuserSpeedCharacteristicCallbacks : public BLECharacteristicCallbacks {
 
 class FocuserHaltRequestCharacteristicCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* pHaltRequestedCharacteristic) {
-
-    String value = pHaltRequestedCharacteristic->getValue();
-    if (value.length() > 0) {
-      // Serial.print("Characteristic event, written: ");
-      // Serial.println(static_cast<int>(value[0])); // Print the integer value
-
-      bHaltRequestFromBLE = static_cast<bool>(value[0]);
-    }
-    // pLedCharacteristic->setValue("Hello World!");
-    // pLedCharacteristic->notify();
+    // String value = pHaltRequestedCharacteristic->getValue();
+    // does not matter on the value, just stop the stepper
+      bSetToMove = false;
+      stepper.stop();
   }
 };
 
