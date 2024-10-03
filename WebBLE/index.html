@@ -183,12 +183,12 @@
                     console.log('Registered Current Position Changed Event and started.');
                     bleStateContainer.innerHTML = 'Connected';
                     bleStateContainer.style.color = "#24af37";
-
             }
             });
         })
         .catch(error => {
             console.log('Error: ', error);
+            window.alert(error);
         })
     }
 
