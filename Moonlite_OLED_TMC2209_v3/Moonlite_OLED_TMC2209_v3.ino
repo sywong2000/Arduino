@@ -119,6 +119,53 @@ bool BLE_DeviceConnected = false;
 bool BLE_DeviceConnectedPrev = false;
 
 
+// SoftwareSerial SoftSerial(SW_RX, SW_TX);                          // Be sure to connect RX to TX and TX to RX between both devices
+// TMC2209Stepper driver(SW_RX, SW_TX, R_SENSE, DRIVER_ADDRESS);   // Create TMC driver
+TMC2209Stepper driver(&Serial0, R_SENSE, DRIVER_ADDRESS); // ESP32 try uses Serial0
+AccelStepper stepper = AccelStepper(stepper.DRIVER, STEP_PIN, DIR_PIN);
+
+unsigned long currentPosition = 10000;
+unsigned long targetPosition = 10000;
+unsigned long lastSavedPosition = 0;
+
+constexpr uint8_t semin = 6;
+constexpr uint8_t semax = 2;
+String OledDisplay = "";
+String OledDisplayed = "";
+
+
+bool eoc = false;
+bool bHalfStep = false;
+int LineLen= 0;
+String cmd, param, line;
+long nSpeedConstant = 100;
+long nSpeedFactor = 16; // default is 250pps (32/02)
+long nSpeed = nSpeedConstant* nSpeedFactor;
+
+float tCoeff = 0;
+bool bSetToMove = false;
+bool bSetIdle = false;
+long millisLastMove = 0;
+long lastCharacteristicsUpdate = 0;
+long nextAdvertisementMillis = -1;
+
+const long millisIdleDelay = 5000; // 10 sec
+const long nBLECharacteristicsRefreshMs = 50;
+
+
+int nCurrent = RMS_CURRENT;
+int nLastPollByClient = 0;
+
+
+long hexstr2long(String hexstr)
+{
+  char buf[hexstr.length() + 1];
+  hexstr.toCharArray(buf, hexstr.length() + 1);
+  return strtol(buf, NULL, 16);
+}
+
+
+
 class FocuserServerCallbacks: public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
     BLE_DeviceConnected = true;
@@ -175,51 +222,6 @@ class FocuserHaltRequestCharacteristicCallbacks : public BLECharacteristicCallba
       stepper.stop();
   }
 };
-
-// SoftwareSerial SoftSerial(SW_RX, SW_TX);                          // Be sure to connect RX to TX and TX to RX between both devices
-// TMC2209Stepper driver(SW_RX, SW_TX, R_SENSE, DRIVER_ADDRESS);   // Create TMC driver
-TMC2209Stepper driver(&Serial0, R_SENSE, DRIVER_ADDRESS); // ESP32 try uses Serial0
-AccelStepper stepper = AccelStepper(stepper.DRIVER, STEP_PIN, DIR_PIN);
-
-unsigned long currentPosition = 10000;
-unsigned long targetPosition = 10000;
-unsigned long lastSavedPosition = 0;
-
-constexpr uint8_t semin = 6;
-constexpr uint8_t semax = 2;
-String OledDisplay = "";
-String OledDisplayed = "";
-
-
-bool eoc = false;
-bool bHalfStep = false;
-int LineLen= 0;
-String cmd, param, line;
-long nSpeedConstant = 100;
-long nSpeedFactor = 16; // default is 250pps (32/02)
-long nSpeed = nSpeedConstant* nSpeedFactor;
-
-float tCoeff = 0;
-bool bSetToMove = false;
-bool bSetIdle = false;
-long millisLastMove = 0;
-long lastCharacteristicsUpdate = 0;
-long nextAdvertisementMillis = -1;
-
-const long millisIdleDelay = 5000; // 10 sec
-const long nBLECharacteristicsRefreshMs = 50;
-
-
-int nCurrent = RMS_CURRENT;
-int nLastPollByClient = 0;
-
-
-long hexstr2long(String hexstr)
-{
-  char buf[hexstr.length() + 1];
-  hexstr.toCharArray(buf, hexstr.length() + 1);
-  return strtol(buf, NULL, 16);
-}
 
 
 void setup() {
@@ -655,13 +657,6 @@ void loop() {
     eoc = false;
   }  // eoc == true
 
-  if (bHaltRequestFromBLE)
-  {
-      bSetToMove = false;
-      stepper.stop();
-      bHaltRequestFromBLE = false;
-  }
-
   if (BLE_DeviceConnected && (millis() - lastCharacteristicsUpdate > nBLECharacteristicsRefreshMs))
   {
     // update the characteristics
@@ -834,3 +829,5 @@ void serialEvent() {
     }
   }
 }
+
+
