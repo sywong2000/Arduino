@@ -95,10 +95,9 @@ SSD1306AsciiWire oled;
 #define SEMAX_CHARACTERISTIC_UUID               "19b10009-e8f2-537e-4f6c-d104768a1214"
 #define SGTHRS_CHARACTERISTIC_UUID              "19b10010-e8f2-537e-4f6c-d104768a1214"
 
+#define SPEED_CHARACTERISTIC_UUID               "19b10011-e8f2-537e-4f6c-d104768a1214"
 
-bool bMoveRequestFromBLE = false;
 bool bHaltRequestFromBLE = false;
-int nRequestedTargetPositionFromBLE = -1;
 
 BLEServer* pServer = NULL;
 BLECharacteristic* pCurrentPosCharacteristic = NULL;    // read, notification
@@ -112,8 +111,9 @@ BLECharacteristic* pSgThrsCharacteristic = NULL;    // read, notification
 
 
 
-BLECharacteristic* pTargetPosCharacteristic = NULL;     // write only
-BLECharacteristic* pHaltRequestCharacteristic = NULL; // write only
+BLECharacteristic* pSpeedCharacteristic = NULL;    // read, write
+BLECharacteristic* pTargetPosCharacteristic = NULL;     // read, write
+BLECharacteristic* pHaltRequestCharacteristic = NULL; // read, write 
 
 
 bool BLE_DeviceConnected = false;
@@ -137,9 +137,32 @@ class FocuserTargetPosCharacteristicCallbacks : public BLECharacteristicCallback
     String value = pTargetPosCharacteristic->getValue();
     
     if (value.length() > 0) {
-      nRequestedTargetPositionFromBLE = value.toInt();
+      int nRequestedTargetPositionFromBLE = value.toInt();
       if (nRequestedTargetPositionFromBLE >=0) {
-        bMoveRequestFromBLE = true; // this will be processed in the loop logic
+        targetPosition = nRequestedTargetPositionFromBLE;
+        stepper.moveTo(targetPosition);
+        driver.rms_current(nCurrent);
+        driver.ihold(0);
+        driver.iholddelay(2);
+        bSetIdle = false;
+        stepper.disableOutputs();
+        updateStepperSpeed(nSpeed);
+      }
+    }
+  }
+};
+
+class FocuserSpeedCharacteristicCallbacks : public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic* pSpeedCharacteristic) {
+
+    String value = pSpeedCharacteristic->getValue();
+    
+    if (value.length() > 0) {
+      int nPPSFromBLE = value.toInt();
+      if (nPPSFromBLE >=0) {
+        nSpeedFactor = 32/nPPSFromBLE;
+        nSpeed = nSpeedConstant * nSpeedFactor;
+        updateStepperSpeed(nSpeed);
       }
     }
   }
@@ -299,6 +322,14 @@ void setup() {
     );
 
   pHaltRequestCharacteristic->setCallbacks(new FocuserHaltRequestCharacteristicCallbacks());
+
+  pSpeedCharacteristic = pService->createCharacteristic(
+    SPEED_CHARACTERISTIC_UUID,
+    BLECharacteristic::PROPERTY_READ   |
+    BLECharacteristic::PROPERTY_WRITE
+    );
+
+  pSpeedCharacteristic->setCallbacks(new FocuserSpeedCharacteristicCallbacks());
 
   pCurrentPosCharacteristic =  pService->createCharacteristic(
     CURRENT_POS_CHARACTERISTIC_UUID,
@@ -523,15 +554,8 @@ void loop() {
       nSpeedFactor = 32/hexstr2long(param);
       // SpeedFactor: smaller value means faster
       nSpeed = nSpeedConstant * nSpeedFactor;
-      float s = targetPosition< stepper.currentPosition()?nSpeed*-1:nSpeed;
-      stepper.setMaxSpeed(s);
-      stepper.setSpeed(s);
-      stepper.setAcceleration(50000);
-
-      // stepper.setMaxSpeed(nSpeed);
-      // stepper.setSpeed(nSpeed);
+      updateStepperSpeed(nSpeed);
     }
-
 
     // get half step    
     if (cmd.equalsIgnoreCase("GH"))
@@ -596,12 +620,8 @@ void loop() {
       driver.ihold(0);
       driver.iholddelay(2);
 
-
       stepper.disableOutputs();
-      float s = targetPosition< stepper.currentPosition()?nSpeed*-1:nSpeed;
-      stepper.setMaxSpeed(s);
-      stepper.setSpeed(s);
-      stepper.setAcceleration(50000);
+      updateStepperSpeed(nSpeed);
       bSetToMove = true;
     }
 
@@ -641,26 +661,6 @@ void loop() {
     line = "";
     eoc = false;
   }  // eoc == true
-
-
-  // process the BLE requests, if any
-  // process the move request
-  if (bMoveRequestFromBLE)
-  {
-    targetPosition = nRequestedTargetPositionFromBLE;
-    stepper.moveTo(targetPosition);
-    driver.rms_current(nCurrent);
-    driver.ihold(0);
-    driver.iholddelay(2);
-    bSetIdle = false;
-    stepper.disableOutputs();
-    float s = targetPosition< stepper.currentPosition()?nSpeed*-1:nSpeed;
-    stepper.setMaxSpeed(s);
-    stepper.setSpeed(s);
-    stepper.setAcceleration(50000);
-    bSetToMove = true;
-    bMoveRequestFromBLE = false;
-  }
 
   if (bHaltRequestFromBLE)
   {
@@ -791,6 +791,14 @@ void loop() {
       bSetIdle = true;
     }
   }
+}
+
+void updateStepperSpeed(int nS)
+{
+  float s = targetPosition< stepper.currentPosition()?nS*-1:nS;
+  stepper.setMaxSpeed(s);
+  stepper.setSpeed(s);
+  stepper.setAcceleration(50000);
 }
 
 void updateOLED()

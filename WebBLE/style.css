@@ -4,35 +4,63 @@ html {
     text-align: center;
 }
 h1 {
-    font-size: 1.8rem;
+    font-size: 1.2rem;
     color: white;
 }
+
+h2 {
+    font-size: 1.0rem;
+}
+
 .topnav {
     overflow: hidden;
     background-color: #0A1128;
 }
+
 body {
     margin: 0;
 }
+
+td
+{
+    vertical-align: top;
+}
+
+.midtable
+{
+    display: inline-block; 
+}
+
 .content {
     padding: 50px;
 }
 .card-grid {
     max-width: 800px;
     margin: 0 auto;
-    margin-bottom: 30px;
+    margin-bottom: 10px;
     display: grid;
-    grid-gap: 2rem;
+    grid-gap: 1rem;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 }
+
 .card {
     background-color: white;
     box-shadow: 2px 2px 12px 1px rgba(140,140,140,.5);
 }
+
+select
+{
+    padding: 14px 20px;
+    margin: 2px 0;
+    border: none;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
 button {
     color: white;
     padding: 14px 20px;
-    margin: 8px 0;
+    margin: 2px 0;
     border: none;
     cursor: pointer;
     border-radius: 4px;
@@ -49,10 +77,17 @@ button {
 
 .forwardButton{
     background-color: #1b8a94;
+    width:7rem;
+}
+
+.stopButton{
+    background-color: #EE2222;
+    width:7rem;
 }
 
 .backwardButton{
     background-color: #5f6c6d;
+    width:7rem;
 }
 
 .connectButton{
@@ -65,9 +100,9 @@ button {
 
 .gray-label { 
     color: #bebebe; 
-    font-size: 1rem; 
+    font-size: 0.8rem; 
 }
 
 .reading { 
-    font-size: 1.8rem;
+    font-size: 1.2rem;
 }

@@ -16,7 +16,7 @@
         <div class="card-grid">
             <div class="card">
                 <p>
-                    <button id="connectBleButton" class="connectButton"> Connect to Moonlite BLE Device</button>
+                    <button id="connectBleButton" class="connectButton"> Connect </button>
                     <button id="disconnectBleButton" class="disconnectButton"> Disconnect </button>
                 </p>
                 <p class="gray-label">BLE state: <strong><span id="bleState" style="color:#d13a30;">Disconnected</span></strong></p>
@@ -24,20 +24,38 @@
         </div>
         <div class="card-grid">   
             <div class="card">
-                <h2>Current Position</h2>
-                <p class="reading"><span id="valueContainer">NaN</span></p>
-                <p class="gray-label">Last reading: <span id="timestamp"></span></p>
-            </div>
-
-            <div class="card">
-                <h2>Step Buttons</h2>
-                <button id="forward1000Button" class="forwardButton">+1000</button><br>
-                <button id="forward500Button" class="forwardButton">+500</button><br>
-                <button id="forward100Button" class="forwardButton">+100</button><br>
-                <button id="backward100Button" class="backwardButton">-100</button><br>
-                <button id="backward500Button" class="backwardButton">-500</button><br>
-                <button id="backward1000Button" class="backwardButton">-1000</button>
-                <p class="gray-label">Last value sent: <span id="valueSent"></span></p>
+                <table class="midtable">
+                    <tr>
+                        <td>
+                            <h2>Current Position</h2>
+                            <p class="reading"><span id="curPositionContainer">NaN</span></p>
+                            <p class="gray-label">Last reading: <span id="timestamp"></span></p>
+                        </td>
+                        <td rowspan="10">
+                            <h2>Step Buttons</h2>
+                            <button id="forward1000Button" class="forwardButton">+1000</button><br>
+                            <button id="forward500Button" class="forwardButton">+500</button><br>
+                            <button id="forward100Button" class="forwardButton">+100</button><br>
+                            <button id="stopButton" class="stopButton">STOP</button><br>
+                            <button id="backward100Button" class="backwardButton">-100</button><br>
+                            <button id="backward500Button" class="backwardButton">-500</button><br>
+                            <button id="backward1000Button" class="backwardButton">-1000</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <h2>Speed</h2>
+                            <p class="reading">
+                                <select name="speedSelection" id="speedSelection">
+                                <option value="2">250 PPS</option>
+                                <option value="4">125 PPS</option>
+                                <option value="8">60 PPS</option>
+                                <option value="10">30 PPS</option>
+                                <option value="20">15 PPS</option>
+                              </select></p>
+                        </td>
+                    </tr>
+                </table>
             </div>
         </div>
     </div>
@@ -58,10 +76,13 @@
     const backward500Button = document.getElementById('backward500Button');
     const backward1000Button = document.getElementById('backward1000Button');
 
-    const retrievedValue = document.getElementById('valueContainer');
-    const latestValueSent = document.getElementById('valueSent');
+    const currentPosValue = document.getElementById('curPositionContainer');
+    //const latestValueSent = document.getElementById('valueSent');
     const bleStateContainer = document.getElementById('bleState');
     const timestampContainer = document.getElementById('timestamp');
+
+
+    const speedSelection = document.getElementById('speedSelection');
 
     //Define BLE Device Specs
     var deviceName ='MOONLITE BLE';
@@ -76,6 +97,7 @@
     var seMinValueCharacteristicUuid            = '19b10008-e8f2-537e-4f6c-d104768a1214';
     var seMaxValueCharacteristicUuid            = '19b10009-e8f2-537e-4f6c-d104768a1214';
     var sgThrsCharacteristicUuid                = '19b10010-e8f2-537e-4f6c-d104768a1214';
+    var speedCharacteristicUuid                = '19b10011-e8f2-537e-4f6c-d104768a1214';
 
 
     //Global Variables to Handle Bluetooth
@@ -104,6 +126,10 @@
     backward100Button.addEventListener('click', () => writeOnTargetPosCharacteristic(currentPosition-100));
     backward500Button.addEventListener('click', () => writeOnTargetPosCharacteristic(currentPosition-500));
     backward1000Button.addEventListener('click', () => writeOnTargetPosCharacteristic(currentPosition-1000));
+    speedSelection.addEventListener('change', (e) => 
+    {
+        writeOnSpeedCharacteristic(e.target.value);
+    });
 
     // Check if BLE is available in your Browser
     function isWebBluetoothEnabled() {
@@ -125,8 +151,6 @@
         })
         .then(device => {
             console.log('Device Selected:', device.name);
-            bleStateContainer.innerHTML = 'Connected to device ' + device.name;
-            bleStateContainer.style.color = "#24af37";
             device.addEventListener('gattservicedisconnected', onDisconnected);
             return device.gatt.connect();
         })
@@ -147,12 +171,15 @@
                     console.log('Current Position Characteristics Found');
                     const newValueReceived = characteristic.readValue();
                     currentPosition = parseInt(newValueReceived);
-                    retrievedValue.innerHTML = newValueReceived;
+                    currentPosValue.innerHTML = newValueReceived;
                     timestampContainer.innerHTML = getDateTime();
 
                     characteristic.addEventListener('characteristicvaluechanged', handleCurrentPosCharacteristicChange);
                     characteristic.startNotifications();
                     console.log('Registered Current Position Changed Event and started.');
+
+                    bleStateContainer.innerHTML = 'Connected to device ' + device.name;
+                    bleStateContainer.style.color = "#24af37";
             }
             })
         })
@@ -176,26 +203,26 @@
         timestampContainer.innerHTML = getDateTime();
     }
 
-    function writeOnCharacteristic(value){
-        if (bleServer && bleServer.connected) {
-            bleServiceFound.getCharacteristic(ledCharacteristic)
-            .then(characteristic => {
-                console.log("Found the LED characteristic: ", characteristic.uuid);
-                const data = new Uint8Array([value]);
-                return characteristic.writeValue(data);
-            })
-            .then(() => {
-                latestValueSent.innerHTML = value;
-                console.log("Value written to LEDcharacteristic:", value);
-            })
-            .catch(error => {
-                console.error("Error writing to the LED characteristic: ", error);
-            });
-        } else {
-            console.error ("Bluetooth is not connected. Cannot write to characteristic.")
-            window.alert("Bluetooth is not connected. Cannot write to characteristic. \n Connect to BLE first!")
-        }
-    }
+    // function writeOnCharacteristic(value){
+    //     if (bleServer && bleServer.connected) {
+    //         bleServiceFound.getCharacteristic(ledCharacteristic)
+    //         .then(characteristic => {
+    //             console.log("Found the LED characteristic: ", characteristic.uuid);
+    //             const data = new Uint8Array([value]);
+    //             return characteristic.writeValue(data);
+    //         })
+    //         .then(() => {
+    //             latestValueSent.innerHTML = value;
+    //             console.log("Value written to LEDcharacteristic:", value);
+    //         })
+    //         .catch(error => {
+    //             console.error("Error writing to the LED characteristic: ", error);
+    //         });
+    //     } else {
+    //         console.error ("Bluetooth is not connected. Cannot write to characteristic.")
+    //         window.alert("Bluetooth is not connected. Cannot write to characteristic. \n Connect to BLE first!")
+    //     }
+    // }
 
     function writeOnTargetPosCharacteristic(value){
         if (bleServer && bleServer.connected) {
@@ -210,13 +237,30 @@
             //     latestValueSent.innerHTML = characteristic.readValue();
             // })
             .catch(error => {
-                console.error("Error writing to the LED characteristic: ", error);
+                console.error("Error writing to the target pos characteristic: ", error);
             });
         } else {
             console.error ("Bluetooth is not connected. Cannot write to characteristic.")
             window.alert("Bluetooth is not connected. Cannot write to characteristic. \n Connect to BLE first!")
         }
     }
+
+    function writeOnSpeedCharacteristic(value){
+        if (bleServer && bleServer.connected) {
+            bleServiceFound.getCharacteristic(speedCharacteristicUuid)
+            .then(characteristic => {
+                console.log("Writing Speed:"+ value);
+                characteristic.writeValueWithoutResponse(new TextEncoder().encode(value));
+                return characteristic;
+            })
+            .catch(error => {
+                console.error("Error writing to the Speed characteristic: ", error);
+            });
+        } else {
+            console.error ("Bluetooth is not connected. Cannot write to characteristic.")
+            window.alert("Bluetooth is not connected. Cannot write to characteristic. \n Connect to BLE first!")
+        }
+    }    
 
     function disconnectDevice() {
         console.log("Disconnect Device.");
