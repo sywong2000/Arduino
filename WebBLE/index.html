@@ -105,6 +105,9 @@
     var bleServer;
     var bleServiceFound;
     var curPositionCharacteristicFound;
+    var textEncoder = new TextEncoder();
+    var textDecoder = new TextDecoder();
+
 
     var currentPosition = 0;
 
@@ -172,7 +175,7 @@
             curPositionCharacteristicFound = characteristic;
             console.log('Current Position Characteristics Found');
             const newValueReceived = characteristic.readValue();
-            currentPosition = parseInt((new TextDecoder().decode(newValueReceived.buffer)));
+            currentPosition = parseInt((textDecoder.decode(newValueReceived.buffer)));
             curPositionContainer.innerHTML = currentPosition.toString();
             timestampContainer.innerHTML = getDateTime();
             characteristic.addEventListener('characteristicvaluechanged', handleCurrentPosCharacteristicChange);
@@ -196,7 +199,7 @@
     }
 
     function handleCurrentPosCharacteristicChange(event){
-        const newValueReceived = new TextDecoder().decode(event.target.value);
+        const newValueReceived = textDecoder.decode(event.target.value);
         currentPosition = parseInt(newValueReceived);
         console.log("Position Updated: ", newValueReceived);
         curPositionContainer.innerHTML = newValueReceived;
@@ -228,10 +231,10 @@
         if (bleServer && bleServer.connected) {
             bleServiceFound.getCharacteristic(targetPosCharacteristicUuid)
             .then(characteristic => {
-                var encoder = new TextEncoder();
+                
                 const data = value.toString();
                 console.log("Writing TargetPos:"+ data);
-                characteristic.writeValueWithResponse(encoder.encode(data));
+                characteristic.writeValueWithResponse(textEncoder.encode(data));
                 // return characteristic;
             })
             // .then(characteristic => {
@@ -251,7 +254,7 @@
             bleServiceFound.getCharacteristic(speedCharacteristicUuid)
             .then(characteristic => {
                 console.log("Writing Speed:"+ value);
-                characteristic.writeValueWithoutResponse(new TextEncoder().encode(value));
+                characteristic.writeValueWithResponse(textEncoder.encode(value));
                 return characteristic;
             })
             .catch(error => {
@@ -269,7 +272,7 @@
             .then(characteristic => {
                 console.log("Stopping... ");
                 // write any values
-                characteristic.writeValueWithoutResponse(new TextEncoder().encode("0"));
+                characteristic.writeValueWithoutResponse(textEncoder.encode("0"));
                 return characteristic;
             })
             .catch(error => {
