@@ -185,13 +185,9 @@
                     bleStateContainer.style.color = "#24af37";
             }
             });
-        })
-        .then(()=>{
-            window.alert("CONNECTED");
-        })
-        .catch(error => {
+        }).catch(error => {
             console.log('Error: ', error);
-            window.alert(error);
+            window.alert('Error: ',error);
         })
     }
 
