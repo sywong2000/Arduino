@@ -175,7 +175,9 @@
             curPositionCharacteristicFound = characteristic;
             console.log('Current Position Characteristics Found');
             const newValueReceived = characteristic.readValue();
-            currentPosition = parseInt((textDecoder.decode(newValueReceived.buffer)));
+            windows.alert("newValueReceived = "+ newValueReceived);
+            windows.alert("decoded = "+ textDecoder.decode(newValueReceived));
+            currentPosition = Number(textDecoder.decode(newValueReceived));
             curPositionContainer.innerHTML = currentPosition.toString();
             timestampContainer.innerHTML = getDateTime();
             characteristic.addEventListener('characteristicvaluechanged', handleCurrentPosCharacteristicChange);
