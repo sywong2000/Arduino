@@ -104,7 +104,7 @@
     //Global Variables to Handle Bluetooth
     var bleServer;
     var bleServiceFound;
-    var sensorCharacteristicFound;
+    var curPositionCharacteristicFound;
 
     var currentPosition = 0;
 
@@ -175,6 +175,7 @@
             var bFound = false;
             characteristics.forEach(characteristic => {
                 if (characteristic.uuid==currentPosCharacteristicUuid){
+                    curPositionCharacteristicFound = characteristic;
                     console.log('Current Position Characteristics Found');
                     const newValueReceived = characteristic.readValue();
                     currentPosition = parseInt(newValueReceived);
@@ -296,8 +297,8 @@
     function disconnectDevice() {
         console.log("Disconnect Device.");
         if (bleServer && bleServer.connected) {
-            if (sensorCharacteristicFound) {
-                sensorCharacteristicFound.stopNotifications()
+            if (curPositionCharacteristicFound) {
+                curPositionCharacteristicFound.stopNotifications()
                     .then(() => {
                         console.log("Notifications Stopped");
                         return bleServer.disconnect();
