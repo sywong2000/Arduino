@@ -169,18 +169,15 @@
             return bleServiceFound.getCharacteristic(currentPosCharacteristicUuid);
         })
         .then(characteristic => {
-                if (characteristic.uuid==currentPosCharacteristicUuid){
-                    curPositionCharacteristicFound = characteristic;
-                    console.log('Current Position Characteristics Found');
-                    const newValueReceived = characteristic.readValue();
-                    currentPosition = parseInt(newValueReceived);
-                    curPositionContainer.innerHTML = newValueReceived;
-                    timestampContainer.innerHTML = getDateTime();
-
-                    characteristic.addEventListener('characteristicvaluechanged', handleCurrentPosCharacteristicChange);
-                    characteristic.startNotifications();
-                    console.log('Registered Current Position Changed Event and started.');
-            }
+            curPositionCharacteristicFound = characteristic;
+            console.log('Current Position Characteristics Found');
+            const newValueReceived = characteristic.readValue();
+            currentPosition = parseInt(new TextDecoder().decode(newValueReceived.buffer));
+            curPositionContainer.innerHTML = currentPosition.toString();
+            timestampContainer.innerHTML = getDateTime();
+            characteristic.addEventListener('characteristicvaluechanged', handleCurrentPosCharacteristicChange);
+            characteristic.startNotifications();
+            // console.log('Registered Current Position Changed Event and started.');
         }).then(()=>{
             bleStateContainer.innerHTML = 'Connected';
             bleStateContainer.style.color = "#24af37";
