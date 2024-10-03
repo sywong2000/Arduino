@@ -166,10 +166,9 @@
         .then(service => {
             console.log("Service discovered:", service.uuid);
             bleServiceFound = service;
-            return service.getCharacteristics();
+            return bleServiceFound.getCharacteristic(currentPosCharacteristicUuid);
         })
-        .then(characteristics => {
-            characteristics.forEach(characteristic => {
+        .then(characteristic => {
                 if (characteristic.uuid==currentPosCharacteristicUuid){
                     curPositionCharacteristicFound = characteristic;
                     console.log('Current Position Characteristics Found');
@@ -182,7 +181,6 @@
                     characteristic.startNotifications();
                     console.log('Registered Current Position Changed Event and started.');
             }
-            });
         }).then(()=>{
             bleStateContainer.innerHTML = 'Connected';
             bleStateContainer.style.color = "#24af37";
