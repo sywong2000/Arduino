@@ -172,7 +172,7 @@
             curPositionCharacteristicFound = characteristic;
             console.log('Current Position Characteristics Found');
             const newValueReceived = characteristic.readValue();
-            currentPosition = parseInt(new TextDecoder().decode(newValueReceived.buffer));
+            currentPosition = parseInt((new TextDecoder().decode(newValueReceived.buffer)));
             curPositionContainer.innerHTML = currentPosition.toString();
             timestampContainer.innerHTML = getDateTime();
             characteristic.addEventListener('characteristicvaluechanged', handleCurrentPosCharacteristicChange);
@@ -231,8 +231,7 @@
                 var encoder = new TextEncoder();
                 const data = value.toString();
                 console.log("Writing TargetPos:"+ data);
-                window.alert("Writing TargetPos:"+ data + ".encoded="+ encoder.encode(data));
-                characteristic.writeValueWithoutResponse(encoder.encode(data));
+                characteristic.writeValueWithResponse(encoder.encode(data));
                 // return characteristic;
             })
             // .then(characteristic => {
