@@ -154,6 +154,9 @@
         })
         .then(device => {
             console.log('Device Selected:', device.name);
+            bleStateContainer.innerHTML = 'Connected to device ' + device.name;
+            bleStateContainer.style.color = "#24af37";
+
             device.addEventListener('gattservicedisconnected', onDisconnected);
             return device.gatt.connect();
         })
@@ -169,6 +172,7 @@
             return service.getCharacteristics();
         })
         .then(characteristics => {
+            var bFound = false;
             characteristics.forEach(characteristic => {
                 if (characteristic.uuid==currentPosCharacteristicUuid){
                     console.log('Current Position Characteristics Found');
@@ -180,11 +184,17 @@
                     characteristic.addEventListener('characteristicvaluechanged', handleCurrentPosCharacteristicChange);
                     characteristic.startNotifications();
                     console.log('Registered Current Position Changed Event and started.');
+                    bFound = true;
 
-                    bleStateContainer.innerHTML = 'Connected to device ' + device.name;
-                    bleStateContainer.style.color = "#24af37";
             }
-            })
+            });
+
+            if (bFound)
+            {
+                bleStateContainer.innerHTML = 'Connected to device ' + device.name;
+                bleStateContainer.style.color = "#24af37";
+            }
+
         })
         .catch(error => {
             console.log('Error: ', error);
