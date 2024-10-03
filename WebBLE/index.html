@@ -171,12 +171,11 @@
             bleServiceFound = service;
             return bleServiceFound.getCharacteristic(currentPosCharacteristicUuid);
         })
-        .then(characteristic => {
+        .then(async characteristic => {
             curPositionCharacteristicFound = characteristic;
             console.log('Current Position Characteristics Found');
-            const newValueReceived = characteristic.readValue();
-            window.alert("newValueReceived = "+ parseInt(newValueReceived).toString());
-            currentPosition = parseInt(newValueReceived);
+            const newValueReceived = await characteristic.readValue();
+            currentPosition = parseInt(textDecoder.decode(newValueReceived));
             curPositionContainer.innerHTML = currentPosition.toString();
             timestampContainer.innerHTML = getDateTime();
             characteristic.addEventListener('characteristicvaluechanged', handleCurrentPosCharacteristicChange);
