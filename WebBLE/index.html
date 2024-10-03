@@ -203,7 +203,7 @@
         const newValueReceived = new TextDecoder().decode(event.target.value);
         currentPosition = parseInt(newValueReceived);
         console.log("Position Updated: ", newValueReceived);
-        retrievedValue.innerHTML = newValueReceived;
+        curPositionContainer.innerHTML = newValueReceived;
         timestampContainer.innerHTML = getDateTime();
     }
 
