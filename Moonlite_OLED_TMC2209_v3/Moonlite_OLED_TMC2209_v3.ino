@@ -169,10 +169,12 @@ long hexstr2long(String hexstr)
 class FocuserServerCallbacks: public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
     BLE_DeviceConnected = true;
+    digitalWrite(SDA,LOW);
   };
 
   void onDisconnect(BLEServer* pServer) {
     BLE_DeviceConnected = false;
+    digitalWrite(SDA,HIGH);
   }
 };
 
@@ -275,6 +277,7 @@ void setup() {
   pinMode(STEP_PIN, OUTPUT);
   pinMode(DIR_PIN, OUTPUT);
   pinMode(ENABLE_PIN, OUTPUT);
+  pinMode(SDA,OUTPUT);
 
   stepper.setEnablePin(ENABLE_PIN);
   stepper.disableOutputs();
@@ -398,6 +401,7 @@ void setup() {
 
 
   OledDisplay = "   IDLE   ";
+  digitalWrite(SDA,HIGH);
   updateOLED();
 }
 
