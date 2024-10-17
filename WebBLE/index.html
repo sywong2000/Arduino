@@ -36,7 +36,11 @@
                             <button id="forward1000Button" class="forwardButton">+1000</button><br>
                             <button id="forward500Button" class="forwardButton">+500</button><br>
                             <button id="forward100Button" class="forwardButton">+100</button><br>
+                            <button id="forward50Button" class="forwardButton">+50</button><br>
+                            <div></div>
                             <button id="stopButton" class="stopButton">STOP</button><br>
+                            <div></div>
+                            <button id="backward50Button" class="backwardButton">-50</button><br>
                             <button id="backward100Button" class="backwardButton">-100</button><br>
                             <button id="backward500Button" class="backwardButton">-500</button><br>
                             <button id="backward1000Button" class="backwardButton">-1000</button>
@@ -72,6 +76,8 @@
     const forward1000Button = document.getElementById('forward1000Button');
     const forward500Button = document.getElementById('forward500Button');
     const forward100Button = document.getElementById('forward100Button');
+    const forward50Button = document.getElementById('forward50Button');
+    const backward50Button = document.getElementById('backward50Button');
     const backward100Button = document.getElementById('backward100Button');
     const backward500Button = document.getElementById('backward500Button');
     const backward1000Button = document.getElementById('backward1000Button');
@@ -127,6 +133,8 @@
     forward1000Button.addEventListener('click', () => writeOnTargetPosCharacteristic(Number(currentPosition)+1000));
     forward500Button.addEventListener('click', () => writeOnTargetPosCharacteristic(Number(currentPosition)+500));
     forward100Button.addEventListener('click', () => writeOnTargetPosCharacteristic(Number(currentPosition)+100));
+    forward50Button.addEventListener('click', () => writeOnTargetPosCharacteristic(Number(currentPosition)+50));
+    backward50Button.addEventListener('click', () => writeOnTargetPosCharacteristic(Number(currentPosition)-50));
     backward100Button.addEventListener('click', () => writeOnTargetPosCharacteristic(Number(currentPosition)-100));
     backward500Button.addEventListener('click', () => writeOnTargetPosCharacteristic(Number(currentPosition)-500));
     backward1000Button.addEventListener('click', () => writeOnTargetPosCharacteristic(Number(currentPosition)-1000));
